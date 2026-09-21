@@ -9,14 +9,12 @@ A discord bot which allows for the coordination of users and finding games to pl
 ### Instructions
 
 ```
-install ngrok
-install discord
-npm install
-npm run register
-npm run start
+clone the repository
+open terminal and cd to Bot
+install requirements.txt
+in bot folder create a .env text file.
+add your discord bot token
 install discord bot to server
-ngrok http 3000
-save forwarding url
-on app page on general info go to interactive endpoint url and paste forwarding url and append /interactions
+
 ```
 
