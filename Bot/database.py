@@ -98,3 +98,16 @@ def replace_user_games(discord_id, games):
         f"Saved {len(games)} games "
         f"for Discord user {discord_id}"
     )
+
+def get_user_games(discord_id):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT g.appid, g.name, ug.playtime
+            FROM user_games ug
+            JOIN games g ON ug.appid = g.appid
+            WHERE ug.discord_id = ?
+        """, (discord_id,))
+
+        return cursor.fetchall()
