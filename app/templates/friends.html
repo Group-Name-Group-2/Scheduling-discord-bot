@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steam Friends | Game Night</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', path='style.css') }}"
+    >
+
+    <style>
+        .friend-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .friend-card {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            color: inherit;
+            text-decoration: none;
+            cursor: pointer;
+            transition: border-color 0.2s, transform 0.2s;
+        }
+
+        .friend-card:hover {
+            border-color: #66c0f4;
+            transform: translateY(-2px);
+        }
+
+        .friend-card:focus-visible {
+            outline: 2px solid #66c0f4;
+            outline-offset: 3px;
+        }
+
+        .friend-card img {
+            width: 64px;
+            height: 64px;
+            object-fit: cover;
+            border-radius: 8px;
+            flex-shrink: 0;
+        }
+
+        .friend-card p {
+            margin-bottom: 0;
+        }
+
+        .friend-action {
+            margin-top: 8px;
+            color: #66c0f4;
+        }
+    </style>
+</head>
+
+<body>
+    <main class="container">
+        <h1>Steam Friends</h1>
+
+        <p>Connected Steam ID: {{ steam_id }}</p>
+
+        {% if error_message %}
+            <p>{{ error_message }}</p>
+        {% endif %}
+
+        {% if friends %}
+            <p>{{ friends | length }} friends saved.</p>
+
+            <div class="friend-list">
+                {% for friend in friends %}
+                    <div
+                        class="friend-card"
+                        role="link"
+                        tabindex="0"
+                        onclick="window.location.href='/friends/{{ friend.steamid }}/shared-games'"
+                        onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); window.location.href='/friends/{{ friend.steamid }}/shared-games'; }"
+                    >
+                        {% if friend.avatar %}
+                            <img
+                                src="{{ friend.avatar }}"
+                                alt="{{ friend.name }}'s profile picture"
+                                width="64"
+                                height="64"
+                                loading="lazy"
+                            >
+                        {% endif %}
+
+                        <div>
+                            <strong>{{ friend.name }}</strong>
+
+                            <p>Steam ID: {{ friend.steamid }}</p>
+
+                            <p class="friend-action">
+                                View shared games
+                            </p>
+
+                            {% if friend.profile_url %}
+                                <p>
+                                    <a
+                                        href="{{ friend.profile_url }}"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onclick="event.stopPropagation()"
+                                        onkeydown="event.stopPropagation()"
+                                    >
+                                        View Steam profile
+                                    </a>
+                                </p>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+        {% elif not error_message %}
+            <p>Your friends list is empty.</p>
+        {% endif %}
+
+        <p><a href="/library">Return to your library</a></p>
+        <p><a href="/">Return to Game Night</a></p>
+    </main>
+</body>
+</html>

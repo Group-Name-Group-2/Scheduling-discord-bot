@@ -1,0 +1,88 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shared Games</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <main>
+        <h1>Shared Games</h1>
+
+        <p>
+            Select the friends whose libraries you want to compare
+            with your own. Leave private or unavailable libraries unchecked.
+        </p>
+
+        <form action="/shared-games" method="get">
+            <div class="friend-list">
+                {% for friend in friends %}
+                    <label class="friend-card">
+                        <input
+                            type="checkbox"
+                            name="friend_ids"
+                            value="{{ friend.steamid }}"
+                            {% if friend.steamid in selected_friend_ids %}
+                                checked
+                            {% endif %}
+                        >
+
+                        {% if friend.avatar %}
+                            <img
+                                src="{{ friend.avatar }}"
+                                alt="{{ friend.name }}'s avatar"
+                                width="48"
+                                height="48"
+                            >
+                        {% endif %}
+
+                        <span>{{ friend.name }}</span>
+                    </label>
+                {% else %}
+                    <p>No saved friends found.</p>
+                {% endfor %}
+            </div>
+
+            <button type="submit">Find Shared Games</button>
+        </form>
+
+        {% if has_compared %}
+            <h2>Results</h2>
+
+            <p>
+                Comparing your library with
+                {{ friend_count }} selected friend(s).
+            </p>
+
+            <p>{{ games | length }} games owned by everyone selected.</p>
+
+            {% if games %}
+                <div class="game-list">
+                    {% for game in games %}
+                        <div class="game-item">
+                            <h3>{{ game.name }}</h3>
+                            <p>
+                                Lowest playtime in group:
+                                {{ (game.min_playtime_forever / 60) | round(1) }}
+                                hours
+                            </p>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p>
+                    No shared games found. Try selecting a different
+                    combination of friends.
+                </p>
+            {% endif %}
+        {% else %}
+            <p>Select at least one friend to find shared games.</p>
+        {% endif %}
+
+        <p><a href="/friends">Back to Friends</a></p>
+        <p><a href="/library">Back to My Library</a></p>
+    </main>
+</body>
+</html>

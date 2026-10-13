@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Game Library | Game Night</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', path='style.css') }}"
+    >
+</head>
+<body>
+    <main class="container">
+        <h1>My Game Library</h1>
+
+        <p>Connected Steam ID: {{ steam_id }}</p>
+
+        {% if games %}
+            <p>{{ games | length }} games found.</p>
+
+            <ul class="game-list">
+                {% for game in games %}
+                    <li class="game-item">
+                        <strong>{{ game.name or "Unknown Game" }}</strong>
+                        <p>
+                            Playtime:
+                            {{ "%.1f"|format(
+                                game.get("playtime_forever", 0) / 60
+                            ) }} hours
+                        </p>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>
+                No games were returned. Your game details may be
+                private, or Steam may have returned an empty library.
+            </p>
+        {% endif %}
+
+        <a href="/">Return to Game Night</a>
+        <p><a href="/friends">View Steam Friends</a></p>
+    </main>
+</body>
+</html>
