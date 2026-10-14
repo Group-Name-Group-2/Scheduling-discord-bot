@@ -293,4 +293,62 @@ async def shared_games_page(request: Request):
         },
     )
 
+@router.get("/friends/{friend_steam_id}/shared-games")
+async def friend_shared_games_page(request: Request, friend_steam_id: str):
+    steam_id = request.session.get("steam_id")
+
+    if not steam_id:
+        return RedirectResponse(url="/", status_code=303)
+
+    # Verify that this person is one of the user's saved friends.
+    saved_friends = get_saved_friends(steam_id)
+
+    friend_ids = {
+        friend["steamid"] for friend in saved_friends
+    }
+
+    if friend_steam_id not in friend_ids:
+        return RedirectResponse(url="/friends", status_code=303)
+
+    # Retrieve the friend's profile information.
+    try:
+        profiles = get_player_summaries([friend_steam_id])
+    except requests.RequestException:
+        profiles = {}
+
+    profile = profiles.get(friend_steam_id, {})
+    friend_name = profile.get("personaname", friend_steam_id)
+    friend_avatar = profile.get("avatarfull")
+
+    # Retrieve the friend's library.
+    try:
+        result = sync_friend_library(friend_steam_id)
+    except requests.RequestException:
+        result = {
+            "games": get_saved_games(friend_steam_id),
+            "available": False,
+            "message": (
+                "Could not contact Steam. "
+                "Showing previously saved games, if available."
+            ),
+        }
+
+    # Only compare libraries when the friend's library is available.
+    games = []
+
+    if result["available"]:
+        games = get_shared_games([steam_id, friend_steam_id])
+
+    return templates.TemplateResponse(request=request, name="friend_shared_games.html", context=
+        {
+            "steam_id": steam_id,
+            "friend_steam_id": friend_steam_id,
+            "friend_name": friend_name,
+            "friend_avatar": friend_avatar,
+            "games": games,
+            "available": result["available"],
+            "message": result["message"],
+        },
+    )
+
 
