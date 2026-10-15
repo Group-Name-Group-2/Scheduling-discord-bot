@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shared Games | Game Night</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', path='style.css') }}"
+    >
+</head>
+
+<body>
+    <main class="container">
+        <h1>Shared Games</h1>
+
+        <section class="friend-summary">
+            {% if friend_avatar %}
+                <img
+                    class="friend-avatar"
+                    src="{{ friend_avatar }}"
+                    alt="{{ friend_name }}'s profile picture"
+                    width="64"
+                    height="64"
+                >
+            {% endif %}
+
+            <div>
+                <h2>You and {{ friend_name }}</h2>
+                <p class="muted-text">
+                    Steam ID: {{ friend_steam_id }}
+                </p>
+            </div>
+        </section>
+
+        <hr>
+
+        {% if not available %}
+            <div class="empty-state">
+                <p>
+                    {{ message or
+                       "This friend's Steam library is private or unavailable." }}
+                </p>
+            </div>
+
+        {% else %}
+            <p>{{ games | length }} games in common.</p>
+
+            {% if games %}
+                <ul class="game-list">
+                    {% for game in games %}
+                        <li class="game-item">
+                            <img
+                                class="game-cover"
+                                src="https://cdn.cloudflare.steamstatic.com/steam/apps/{{ game.appid }}/header.jpg"
+                                alt="{{ game.name or 'Unknown Game' }} cover art"
+                                loading="lazy"
+                                onerror="this.style.display='none'"
+                            >
+
+                            <div class="game-info">
+                                <h2 class="game-title">
+                                    {{ game.name or "Unknown Game" }}
+                                </h2>
+
+                                <p>Owned by both players</p>
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <div class="empty-state">
+                    <p>
+                        No shared games were found in the available libraries.
+                    </p>
+                </div>
+            {% endif %}
+        {% endif %}
+
+        <nav class="page-links">
+            <a href="/friends">Back to friends</a>
+            <a href="/library">Return to your library</a>
+            <a href="/shared-games">Compare multiple friends</a>
+        </nav>
+    </main>
+</body>
+</html>
