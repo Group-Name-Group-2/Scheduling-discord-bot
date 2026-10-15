@@ -10,11 +10,14 @@
         href="{{ url_for('static', path='style.css') }}"
     >
 </head>
+
 <body>
     <main class="container">
         <h1>My Game Library</h1>
 
-        <p>Connected Steam ID: {{ steam_id }}</p>
+        <p class="muted-text">
+            Connected Steam ID: {{ steam_id }}
+        </p>
 
         {% if games %}
             <p>{{ games | length }} games found.</p>
@@ -22,25 +25,44 @@
             <ul class="game-list">
                 {% for game in games %}
                     <li class="game-item">
-                        <strong>{{ game.name or "Unknown Game" }}</strong>
-                        <p>
-                            Playtime:
-                            {{ "%.1f"|format(
-                                game.get("playtime_forever", 0) / 60
-                            ) }} hours
-                        </p>
+                        <img
+                            class="game-cover"
+                            src="https://cdn.cloudflare.steamstatic.com/steam/apps/{{ game.appid }}/header.jpg"
+                            alt="{{ game.name or 'Unknown Game' }} cover art"
+                            loading="lazy"
+                            onerror="this.style.display='none'"
+                        >
+
+                        <div class="game-info">
+                            <h2 class="game-title">
+                                {{ game.name or "Unknown Game" }}
+                            </h2>
+
+                            <p>
+                                Playtime:
+                                {{ "%.1f"|format(
+                                    game.get("playtime_forever", 0) / 60
+                                ) }} hours
+                            </p>
+                        </div>
                     </li>
                 {% endfor %}
             </ul>
+
         {% else %}
-            <p>
-                No games were returned. Your game details may be
-                private, or Steam may have returned an empty library.
-            </p>
+            <div class="empty-state">
+                <p>
+                    No games were returned. Your game details may be
+                    private, or Steam may have returned an empty library.
+                </p>
+            </div>
         {% endif %}
 
-        <a href="/">Return to Game Night</a>
-        <p><a href="/friends">View Steam Friends</a></p>
+        <nav class="page-links">
+            <a href="/">Return to Game Night</a>
+            <a href="/friends">View Steam Friends</a>
+            <a href="/shared-games">Find Shared Games</a>
+        </nav>
     </main>
 </body>
 </html>
