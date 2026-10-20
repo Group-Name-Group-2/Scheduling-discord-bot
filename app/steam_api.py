@@ -102,3 +102,41 @@ def get_player_summaries(steam_ids: list[str]) -> dict:
             }
 
     return profiles
+
+def get_game_details(app_id: int) -> dict | None:
+    """Retrieve detailed information about a game from the Steam Store API."""
+
+    url = "https://store.steampowered.com/api/appdetails"
+
+    params = {
+        "appids": app_id,
+        "l": "en",
+    }
+
+    response = requests.get(url, params=params, timeout=15)
+    response.raise_for_status()
+
+    result = response.json().get(str(app_id), {})
+
+    # Steam can return success=False for unavailable or invalid games.
+    if not result.get("success"):
+        return None
+
+    game = result.get("data", {})
+
+    return {
+        "appid": app_id,
+        "name": game.get("name", "Unknown Game"),
+        "description": game.get("short_description", ""),
+        "release_date": game.get("release_date", {}).get(
+            "date", "Unknown"
+        ),
+        "developers": game.get("developers", []),
+        "publishers": game.get("publishers", []),
+        "genres": [
+            genre.get("description", "")
+            for genre in game.get("genres", [])
+        ],
+        "header_image": game.get("header_image", ""),
+        "website": game.get("website", ""),
+    }
