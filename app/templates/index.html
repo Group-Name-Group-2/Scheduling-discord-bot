@@ -12,13 +12,14 @@
     >
 </head>
 <body>
+    {% include "navbar.html" %}
     <main class="container">
         <h1>Game Night</h1>
 
         <p>Find games you and your friends can play together.</p>
 
-        <a href="/auth/steam">
-            <button id="connect-steam">Connect Steam</button>
+        <a class="button" href="/auth/steam" id="connect-steam">
+            Connect Steam
         </a>
     </main>
 
