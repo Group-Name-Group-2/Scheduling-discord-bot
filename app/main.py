@@ -66,3 +66,11 @@ def game_details(app_id: int):
             status_code=502,
             detail="Steam could not provide game details right now."
         )
+
+@app.get("/events")
+def events(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="events.html",
+        context={}
+    )

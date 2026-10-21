@@ -1,0 +1,32 @@
+document.addEventListener("DOMContentLoaded", () => {
+    const calendarElement = document.getElementById("calendar");
+
+    if (!calendarElement || typeof FullCalendar === "undefined") {
+        return;
+    }
+
+    const calendar = new FullCalendar.Calendar(calendarElement, {
+        initialView: "dayGridMonth",
+        height: "auto",
+        fixedWeekCount: false,
+        showNonCurrentDates: true,
+        firstDay: 0,
+
+        headerToolbar: {
+            left: "prev,next today",
+            center: "title",
+            right: ""
+        },
+
+        buttonText: {
+            today: "Today"
+        },
+
+        dateClick(info) {
+            // Placeholder for future event creation.
+            console.log("Selected calendar date:", info.dateStr);
+        }
+    });
+
+    calendar.render();
+});

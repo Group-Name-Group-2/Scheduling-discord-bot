@@ -480,3 +480,146 @@ ul.game-list .game-item p {
 .game-details p:first-child {
     color: #ffffff;
 }
+
+/* Events calendar */
+
+.events-container {
+    max-width: 1500px;
+}
+
+.events-heading {
+    margin-bottom: 28px;
+}
+
+.events-heading h1 {
+    margin-bottom: 8px;
+}
+
+.calendar-panel {
+    padding: 24px;
+    background-color: #1b2029;
+    border: 1px solid #303947;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgb(0 0 0 / 15%);
+}
+
+/* Calendar header and navigation */
+
+#calendar {
+    color: #ffffff;
+}
+
+#calendar .fc-toolbar {
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+}
+
+#calendar .fc-toolbar-title {
+    color: #ffffff;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+#calendar .fc-button-primary {
+    background-color: #263548;
+    border-color: #45566b;
+    color: #ffffff;
+    box-shadow: none;
+    text-transform: none;
+}
+
+#calendar .fc-button-primary:hover {
+    background-color: #344a62;
+    border-color: #66c0f4;
+}
+
+#calendar .fc-button-primary:disabled {
+    background-color: #232936;
+    border-color: #303947;
+    color: #8193a5;
+    opacity: 0.7;
+}
+
+#calendar .fc-button-primary:focus {
+    box-shadow: 0 0 0 2px rgb(102 192 244 / 30%);
+}
+
+/* Calendar grid */
+
+#calendar .fc-scrollgrid {
+    border-color: #303947;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+#calendar th,
+#calendar td,
+#calendar .fc-scrollgrid {
+    border-color: #303947;
+}
+
+#calendar .fc-col-header-cell {
+    background-color: #232936;
+}
+
+#calendar .fc-col-header-cell-cushion {
+    padding: 12px 4px;
+    color: #aebdca;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+#calendar .fc-daygrid-day {
+    background-color: #1b2029;
+    transition: background-color 0.15s ease;
+}
+
+#calendar .fc-daygrid-day:hover {
+    background-color: #232f3d;
+}
+
+#calendar .fc-daygrid-day-number {
+    padding: 10px;
+    color: #d8e0e8;
+    text-decoration: none;
+}
+
+#calendar .fc-day-other .fc-daygrid-day-number {
+    color: #647180;
+}
+
+#calendar .fc-day-today {
+    background-color: rgb(102 192 244 / 8%) !important;
+}
+
+#calendar .fc-day-today .fc-daygrid-day-number {
+    color: #66c0f4;
+    font-weight: 700;
+}
+
+/* Responsive layout */
+
+@media (max-width: 700px) {
+    .calendar-panel {
+        padding: 12px;
+    }
+
+    #calendar .fc-toolbar {
+        justify-content: center;
+    }
+
+    #calendar .fc-toolbar-title {
+        font-size: 1.2rem;
+    }
+
+    #calendar .fc-col-header-cell-cushion {
+        padding: 8px 1px;
+        font-size: 0.8rem;
+    }
+
+    #calendar .fc-daygrid-day-number {
+        padding: 6px;
+        font-size: 0.85rem;
+    }
+}
