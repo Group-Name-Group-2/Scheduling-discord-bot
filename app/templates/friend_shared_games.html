@@ -9,10 +9,15 @@
         rel="stylesheet"
         href="{{ url_for('static', path='style.css') }}"
     >
+    <script
+        src="{{ url_for('static', path='script.js') }}"
+        defer
+    ></script>
 </head>
 
 <body>
     {% include "navbar.html" %}
+
     <main class="container">
         <h1>Shared Games</h1>
 
@@ -51,7 +56,16 @@
             {% if games %}
                 <ul class="game-list">
                     {% for game in games %}
-                        <li class="game-item">
+                        <li
+                            class="game-item game-card-clickable"
+                            tabindex="0"
+                            role="button"
+                            aria-haspopup="dialog"
+                            aria-label="View details for {{ game.name or 'Unknown Game' }}"
+                            data-appid="{{ game.appid }}"
+                            data-game-name="{{ game.name or 'Unknown Game' }}"
+                            data-playtime="0"
+                        >
                             <img
                                 class="game-cover"
                                 src="https://cdn.cloudflare.steamstatic.com/steam/apps/{{ game.appid }}/header.jpg"
@@ -85,5 +99,52 @@
             <a href="/shared-games">Compare multiple friends</a>
         </nav>
     </main>
+
+    <dialog id="game-modal" class="game-modal">
+        <div class="game-modal-content">
+            <button
+                type="button"
+                class="game-modal-close"
+                id="game-modal-close"
+                aria-label="Close game details"
+            >&times;</button>
+
+            <img
+                id="modal-game-cover"
+                class="game-modal-cover"
+                src=""
+                alt=""
+            >
+
+            <div class="game-modal-info">
+                <h2 id="modal-game-title">Game Details</h2>
+
+                <p id="modal-game-playtime" class="muted-text"></p>
+
+                <div id="modal-game-details" class="game-details">
+                    <p class="muted-text">
+                        Select a game to view its details.
+                    </p>
+                </div>
+
+                <div class="game-modal-actions">
+                    <a
+                        id="modal-steam-link"
+                        class="button"
+                        href="#"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >View on Steam</a>
+
+                    <button
+                        type="button"
+                        id="create-event-button"
+                        disabled
+                        title="Event creation is not available yet"
+                    >Create Event (Coming Soon)</button>
+                </div>
+            </div>
+        </div>
+    </dialog>
 </body>
 </html>
