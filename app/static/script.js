@@ -11,6 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const modalTitle = document.getElementById("modal-game-title");
     const modalPlaytime = document.getElementById("modal-game-playtime");
     const steamLink = document.getElementById("modal-steam-link");
+    const createEventButton = document.getElementById("modal-create-event");
 
     // We'll use this element to display the extra game information.
     const detailsContainer = document.getElementById("modal-game-details");
@@ -106,6 +107,26 @@ document.addEventListener("DOMContentLoaded", () => {
                 openGameModal(card);
             }
         });
+    });
+
+    createEventButton.addEventListener("click", () => {
+    const appId = modalTitle.dataset.appid;
+    const gameName = modalTitle.textContent;
+
+    const params = new URLSearchParams({
+        game_id: appId,
+        game_name: gameName
+    });
+
+    const friendIds = (modal.dataset.friendIds || "")
+        .split(",")
+        .filter(Boolean);
+
+    friendIds.forEach((friendId) => {
+        params.append("friend_id", friendId);
+    });
+
+    window.location.href = `/events/create?${params.toString()}`;
     });
 
     closeButton.addEventListener("click", () => {

@@ -623,3 +623,143 @@ ul.game-list .game-item p {
         font-size: 0.85rem;
     }
 }
+
+.event-form-container {
+    max-width: 850px;
+    margin: 40px auto;
+}
+
+.event-form {
+    padding: 28px;
+    background-color: #1b2029;
+    border: 1px solid #303947;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgb(0 0 0 / 15%);
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 24px;
+}
+
+.form-group label {
+    color: #ffffff;
+    font-weight: 600;
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px;
+    color: #ffffff;
+    background-color: #232936;
+    border: 1px solid #45566b;
+    border-radius: 6px;
+    font: inherit;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: 2px solid #66c0f4;
+    outline-offset: 2px;
+}
+
+.form-group .muted-text {
+    margin: 0;
+    font-size: 0.85rem;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.event-participants {
+    padding: 16px;
+    background-color: #232936;
+    border: 1px solid #303947;
+    border-radius: 6px;
+}
+
+.event-participants p {
+    margin: 0;
+}
+
+.event-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 28px;
+}
+
+#event-form-message {
+    margin-top: 16px;
+}
+
+@media (max-width: 600px) {
+    .event-form {
+        padding: 18px;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+    .event-form-actions {
+        flex-direction: column-reverse;
+    }
+
+    .event-form-actions .button {
+        width: 100%;
+        box-sizing: border-box;
+        text-align: center;
+    }
+}
+
+.event-participants {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 350px;
+    overflow-y: auto;
+}
+
+.event-participant {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px;
+    background-color: #1b2029;
+    border: 1px solid #303947;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.event-participant:hover {
+    background-color: #303e50;
+}
+
+.event-participant input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    accent-color: #66c0f4;
+}
+
+.event-participant-avatar {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.event-participant span {
+    overflow-wrap: anywhere;
+}

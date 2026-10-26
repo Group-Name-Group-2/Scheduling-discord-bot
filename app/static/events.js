@@ -23,8 +23,8 @@ document.addEventListener("DOMContentLoaded", () => {
         },
 
         dateClick(info) {
-            // Placeholder for future event creation.
-            console.log("Selected calendar date:", info.dateStr);
+            window.location.href =
+                `/events/create?date=${encodeURIComponent(info.dateStr)}`;
         }
     });
 

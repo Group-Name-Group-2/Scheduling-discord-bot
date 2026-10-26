@@ -57,6 +57,7 @@ def init_db():
                 app_id INTEGER NOT NULL,
                 event_date TEXT NOT NULL,
                 event_time TEXT NOT NULL,
+                duration_minutes INTEGER NOT NULL DEFAULT 120,
                 created_at TEXT NOT NULL,
             
                 FOREIGN KEY (creator_steam_id)
@@ -241,8 +242,9 @@ def save_game_night_event(
     app_id: int,
     event_date: str,
     event_time: str,
+    duration_minutes: int,
     participant_steam_ids: list[str],
-):
+) -> int:
     init_db()
 
     created_at = datetime.now(timezone.utc).isoformat()
@@ -255,22 +257,24 @@ def save_game_night_event(
                 app_id,
                 event_date,
                 event_time,
+                duration_minutes,
                 created_at
             )
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
             (
                 creator_steam_id,
                 app_id,
                 event_date,
                 event_time,
+                duration_minutes,
                 created_at,
             ),
         )
 
         event_id = cursor.lastrowid
 
-        for participant_steam_id in set(participant_steam_ids):
+        for participant_id in set(participant_steam_ids):
             connection.execute(
                 """
                 INSERT INTO event_participants (
@@ -279,8 +283,7 @@ def save_game_night_event(
                 )
                 VALUES (?, ?)
                 """,
-                (event_id, participant_steam_id),
+                (event_id, participant_id),
             )
 
     return event_id
-
