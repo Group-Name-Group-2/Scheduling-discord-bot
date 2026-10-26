@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Friend's Library | Game Night</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', path='style.css') }}"
+    >
+</head>
+<body>
+    <main class="container">
+        <h1>Friend's Steam Library</h1>
+
+        <p>Friend's Steam ID: {{ friend_steam_id }}</p>
+
+        {% if message %}
+            <p>{{ message }}</p>
+        {% endif %}
+
+        {% if games %}
+            <p>{{ games | length }} games saved.</p>
+
+            <ul class="game-list">
+                {% for game in games %}
+                    <li class="game-item">
+                        <strong>{{ game.name }}</strong>
+                        <p>
+                            Playtime:
+                            {{ "%.1f"|format(game.playtime_forever / 60) }}
+                            hours
+                        </p>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% elif not message %}
+            <p>No games were found in this library.</p>
+        {% endif %}
+
+        <p><a href="/friends">Return to Steam Friends</a></p>
+        <p><a href="/library">Return to your library</a></p>
+    </main>
+</body>
+</html>

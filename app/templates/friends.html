@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steam Friends | Game Night</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', path='style.css') }}"
+    >
+</head>
+
+<body>
+    {% include "navbar.html" %}
+    <main class="container">
+        <h1>Steam Friends</h1>
+
+        <p class="muted-text">Connected Steam ID: {{ steam_id }}</p>
+
+        {% if error_message %}
+            <div class="empty-state">
+                <p>{{ error_message }}</p>
+            </div>
+        {% endif %}
+
+        {% if friends %}
+            <p>{{ friends | length }} friends saved.</p>
+
+            <div class="friend-list friends-page-list">
+                {% for friend in friends %}
+                    <div
+                        class="friend-card friends-page-card"
+                        role="link"
+                        tabindex="0"
+                        onclick="window.location.href='/friends/{{ friend.steamid }}/shared-games'"
+                        onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); window.location.href='/friends/{{ friend.steamid }}/shared-games'; }"
+                    >
+                        {% if friend.avatar %}
+                            <img
+                                src="{{ friend.avatar }}"
+                                alt="{{ friend.name }}'s profile picture"
+                                width="64"
+                                height="64"
+                                loading="lazy"
+                            >
+                        {% endif %}
+
+                        <div>
+                            <strong>{{ friend.name }}</strong>
+
+                            <p class="muted-text">
+                                Steam ID: {{ friend.steamid }}
+                            </p>
+
+                            <p class="friend-action">
+                                <a>View shared games</a>
+                            </p>
+
+                            {% if friend.profile_url %}
+                                <p>
+                                    <a
+                                        href="{{ friend.profile_url }}"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onclick="event.stopPropagation()"
+                                        onkeydown="event.stopPropagation()"
+                                    >
+                                        View Steam profile
+                                    </a>
+                                </p>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+        {% elif not error_message %}
+            <div class="empty-state">
+                <p>Your friends list is empty.</p>
+            </div>
+        {% endif %}
+
+        <nav class="page-links">
+            <a href="/library">Return to your library</a>
+            <a href="/shared-games">Find Shared Games</a>
+            <a href="/">Return to Game Night</a>
+        </nav>
+    </main>
+</body>
+</html>

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Events | Game Night</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', path='style.css') }}"
+    >
+
+    <link
+        href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.min.css"
+        rel="stylesheet"
+    >
+
+    <script
+        src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.min.js"
+        defer
+    ></script>
+
+    <script
+        src="{{ url_for('static', path='events.js') }}"
+        defer
+    ></script>
+</head>
+
+<body>
+    {% include "navbar.html" %}
+
+    <main class="container events-container">
+        <div class="events-heading">
+            <div>
+                <h1>Game Night Calendar</h1>
+                <p class="muted-text">
+                    Keep track of upcoming game nights with your friends.
+                </p>
+            </div>
+        </div>
+
+        <section class="calendar-panel">
+            <div id="calendar"></div>
+        </section>
+    </main>
+</body>
+</html>

@@ -1,0 +1,625 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background-color: #171a21;
+    color: #ffffff;
+    margin: 0;
+    min-height: 100vh;
+}
+
+body > nav.navbar {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 20px;
+    padding: 18px 32px;
+    margin: 0;
+    background-color: #1b2838;
+    border-bottom: 2px solid #66c0f4;
+}
+
+body > nav.navbar a {
+    text-decoration: none;
+}
+
+body > nav.navbar .navbar-brand {
+    color: #ffffff;
+    font-size: 1.5rem;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+body > nav.navbar .navbar-brand:hover {
+    color: #66c0f4;
+}
+
+body > nav.navbar .navbar-links {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+body > nav.navbar .navbar-links a {
+    display: inline-block;
+    padding: 10px 14px;
+    border-radius: 6px;
+    color: #c7d0d9;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+body > nav.navbar .navbar-links a:hover {
+    background-color: #303e50;
+    color: #ffffff;
+    text-decoration: none;
+}
+
+@media (max-width: 650px) {
+    body > nav.navbar {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 16px;
+    }
+
+    body > nav.navbar .navbar-links {
+        justify-content: flex-start;
+        width: 100%;
+        gap: 4px;
+    }
+}
+.container {
+    width: min(1200px, 100%);
+    margin: 0 auto;
+    padding: 40px 24px;
+}
+
+h1, h2, h3 {
+    color: #ffffff;
+}
+
+p {
+    line-height: 1.5;
+}
+
+a {
+    color: #66c0f4;
+    text-decoration: none;
+}
+
+a:hover {
+    color: #a4d7f5;
+    text-decoration: underline;
+}
+
+button, .button {
+    display: inline-block;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 6px;
+    background-color: #1b9fff;
+    color: #ffffff;
+    font-size: 16px;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+button:hover, .button:hover {
+    background-color: #1685d4;
+    color: #ffffff;
+    text-decoration: none;
+}
+
+ul.game-list {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 20px;
+    width: 100%;
+    list-style: none;
+    padding: 0;
+    margin: 24px 0;
+    text-align: center;
+}
+
+ul.game-list > li.game-item {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+    background-color: #232936;
+    border: 1px solid #303947;
+    border-radius: 8px;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+ul.game-list > li.game-item:hover {
+    transform: translateY(-3px);
+    border-color: #66c0f4;
+}
+
+/* Cover art */
+ul.game-list .game-cover {
+    display: block;
+    width: 100%;
+    height: 58%;
+    flex-shrink: 0;
+    object-fit: cover;
+}
+
+/* Card content */
+ul.game-list .game-info {
+    flex: 1;
+    min-height: 0;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+ul.game-list .game-title {
+    margin: 0 0 6px;
+    font-size: 0.95rem;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+ul.game-list .game-item p {
+    margin: 4px 0 0;
+    color: #c7d0d9;
+    font-size: 0.85rem;
+}
+
+/* ---------- Friend cards ---------- */
+
+.friend-list {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 20px;
+    margin: 24px 0;
+}
+
+@media (max-width: 700px) {
+    .friend-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+}
+
+.friend-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    min-width: 0;
+    min-height: 150px;
+    padding: 16px;
+    background-color: #232936;
+    border: 1px solid #303947;
+    border-radius: 8px;
+    color: inherit;
+    cursor: pointer;
+    text-align: center;
+    overflow-wrap: anywhere;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.friend-card:hover {
+    border-color: #66c0f4;
+    transform: translateY(-2px);
+}
+
+.friend-card img {
+    width: 64px;
+    height: 64px;
+    object-fit: cover;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+.friend-card p {
+    margin-bottom: 0;
+}
+
+.friend-action {
+    margin-top: 8px;
+    color: #66c0f4;
+}
+
+.friend-summary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin: 24px 0;
+    text-align: left;
+}
+
+.friend-summary h2 {
+    margin: 0 0 6px;
+}
+
+.friend-summary p {
+    margin: 0;
+}
+
+.friend-avatar {
+    width: 64px;
+    height: 64px;
+    object-fit: cover;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+@media (max-width: 600px) {
+    .friend-summary {
+        gap: 12px;
+    }
+}
+
+/* Regular friends page */
+.friends-page-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.friends-page-card {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    min-height: 0;
+    text-align: left;
+    overflow-wrap: anywhere;
+}
+
+.friends-page-card:focus-visible {
+    outline: 2px solid #66c0f4;
+    outline-offset: 3px;
+}
+
+.friends-page-card p {
+    margin-bottom: 0;
+}
+
+.friends-page-card .friend-action {
+    margin-top: 8px;
+    color: #66c0f4;
+}
+
+/* Shared-games results */
+.results-section {
+    margin-top: 32px;
+}
+
+.results-section > h2 {
+    margin-bottom: 8px;
+}
+
+/* ---------- Utility styles ---------- */
+
+.page-links {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 32px;
+}
+
+.muted-text {
+    color: #c7d0d9;
+}
+
+.empty-state {
+    padding: 24px;
+    background-color: #232936;
+    border: 1px solid #303947;
+    border-radius: 8px;
+}
+
+.game-card-clickable {
+    cursor: pointer;
+}
+
+.game-card-clickable:focus-visible {
+    outline: 2px solid #66c0f4;
+    outline-offset: 3px;
+}
+
+.game-modal {
+    width: min(650px, calc(100% - 32px));
+    max-width: 650px;
+    max-height: 85vh;
+    padding: 0;
+    overflow: auto;
+    color: #ffffff;
+    background-color: #1b2838;
+    border: 1px solid #45566b;
+    border-radius: 12px;
+}
+
+.game-modal::backdrop {
+    background-color: rgb(0 0 0 / 75%);
+    backdrop-filter: blur(3px);
+}
+
+.game-modal-content {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 24px;
+    padding: 28px;
+}
+
+.game-modal-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    padding: 4px 12px;
+    background: transparent;
+    color: #c7d0d9;
+    font-size: 28px;
+    line-height: 1.2;
+}
+
+.game-modal-close:hover {
+    background-color: #303e50;
+    color: #ffffff;
+}
+
+.game-modal-cover {
+    width: 42%;
+    max-width: 240px;
+    height: auto;
+    border-radius: 8px;
+    object-fit: cover;
+}
+
+.game-modal-info {
+    flex: 1;
+    min-width: 0;
+    padding-top: 12px;
+}
+
+.game-modal-info h2 {
+    margin-top: 0;
+    padding-right: 20px;
+    overflow-wrap: anywhere;
+}
+
+.game-modal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.game-modal-actions button:disabled {
+    background-color: #45566b;
+    color: #c7d0d9;
+    cursor: not-allowed;
+    opacity: 0.8;
+}
+
+@media (max-width: 550px) {
+    .game-modal-content {
+        flex-direction: column;
+        align-items: center;
+        padding: 24px 20px;
+    }
+
+    .game-modal-cover {
+        width: 100%;
+        max-width: 300px;
+    }
+
+    .game-modal-info {
+        width: 100%;
+        padding-top: 0;
+    }
+
+    .game-modal-actions {
+        flex-direction: column;
+    }
+
+    .game-modal-actions .button,
+    .game-modal-actions button {
+        width: 100%;
+        text-align: center;
+    }
+}
+
+@media (max-width: 600px) {
+    @media (max-width: 700px) {
+    ul.game-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .container {
+        padding: 24px 16px;
+    }
+}
+
+    .game-info {
+        padding: 12px;
+    }
+
+    .friend-card {
+        gap: 12px;
+        padding: 12px;
+    }
+}
+
+.game-details {
+    color: #c7d0d9;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.game-details p {
+    margin: 10px 0;
+}
+
+.game-details p:first-child {
+    color: #ffffff;
+}
+
+/* Events calendar */
+
+.events-container {
+    max-width: 1500px;
+}
+
+.events-heading {
+    margin-bottom: 28px;
+}
+
+.events-heading h1 {
+    margin-bottom: 8px;
+}
+
+.calendar-panel {
+    padding: 24px;
+    background-color: #1b2029;
+    border: 1px solid #303947;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgb(0 0 0 / 15%);
+}
+
+/* Calendar header and navigation */
+
+#calendar {
+    color: #ffffff;
+}
+
+#calendar .fc-toolbar {
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+}
+
+#calendar .fc-toolbar-title {
+    color: #ffffff;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+#calendar .fc-button-primary {
+    background-color: #263548;
+    border-color: #45566b;
+    color: #ffffff;
+    box-shadow: none;
+    text-transform: none;
+}
+
+#calendar .fc-button-primary:hover {
+    background-color: #344a62;
+    border-color: #66c0f4;
+}
+
+#calendar .fc-button-primary:disabled {
+    background-color: #232936;
+    border-color: #303947;
+    color: #8193a5;
+    opacity: 0.7;
+}
+
+#calendar .fc-button-primary:focus {
+    box-shadow: 0 0 0 2px rgb(102 192 244 / 30%);
+}
+
+/* Calendar grid */
+
+#calendar .fc-scrollgrid {
+    border-color: #303947;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+#calendar th,
+#calendar td,
+#calendar .fc-scrollgrid {
+    border-color: #303947;
+}
+
+#calendar .fc-col-header-cell {
+    background-color: #232936;
+}
+
+#calendar .fc-col-header-cell-cushion {
+    padding: 12px 4px;
+    color: #aebdca;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+#calendar .fc-daygrid-day {
+    background-color: #1b2029;
+    transition: background-color 0.15s ease;
+}
+
+#calendar .fc-daygrid-day:hover {
+    background-color: #232f3d;
+}
+
+#calendar .fc-daygrid-day-number {
+    padding: 10px;
+    color: #d8e0e8;
+    text-decoration: none;
+}
+
+#calendar .fc-day-other .fc-daygrid-day-number {
+    color: #647180;
+}
+
+#calendar .fc-day-today {
+    background-color: rgb(102 192 244 / 8%) !important;
+}
+
+#calendar .fc-day-today .fc-daygrid-day-number {
+    color: #66c0f4;
+    font-weight: 700;
+}
+
+/* Responsive layout */
+
+@media (max-width: 700px) {
+    .calendar-panel {
+        padding: 12px;
+    }
+
+    #calendar .fc-toolbar {
+        justify-content: center;
+    }
+
+    #calendar .fc-toolbar-title {
+        font-size: 1.2rem;
+    }
+
+    #calendar .fc-col-header-cell-cushion {
+        padding: 8px 1px;
+        font-size: 0.8rem;
+    }
+
+    #calendar .fc-daygrid-day-number {
+        padding: 6px;
+        font-size: 0.85rem;
+    }
+}
