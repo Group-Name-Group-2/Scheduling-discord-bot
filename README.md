@@ -8,6 +8,8 @@ A discord bot which allows for the coordination of users and finding games to pl
 
 ### Instructions
 
+
+#outdated
 ```
 clone the repository
 open terminal and cd to Bot
