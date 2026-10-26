@@ -50,6 +50,33 @@ def init_db():
                 FOREIGN KEY (steam_id)
                     REFERENCES steam_users(steam_id)
             );
+            
+            CREATE TABLE IF NOT EXISTS game_night_events (
+                event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                creator_steam_id TEXT NOT NULL,
+                app_id INTEGER NOT NULL,
+                event_date TEXT NOT NULL,
+                event_time TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+            
+                FOREIGN KEY (creator_steam_id)
+                    REFERENCES steam_users(steam_id),
+            
+                FOREIGN KEY (app_id)
+                    REFERENCES games(app_id)
+            );
+            
+            CREATE TABLE IF NOT EXISTS event_participants (
+                event_id INTEGER NOT NULL,
+                participant_steam_id TEXT NOT NULL,
+            
+                PRIMARY KEY (event_id, participant_steam_id),
+            
+                FOREIGN KEY (event_id)
+                    REFERENCES game_night_events(event_id)
+                    ON DELETE CASCADE
+            );
+        
         """)
 
 
@@ -208,4 +235,52 @@ def get_saved_friends(steam_id: str):
         }
         for row in rows
     ]
+
+def save_game_night_event(
+    creator_steam_id: str,
+    app_id: int,
+    event_date: str,
+    event_time: str,
+    participant_steam_ids: list[str],
+):
+    init_db()
+
+    created_at = datetime.now(timezone.utc).isoformat()
+
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            INSERT INTO game_night_events (
+                creator_steam_id,
+                app_id,
+                event_date,
+                event_time,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                creator_steam_id,
+                app_id,
+                event_date,
+                event_time,
+                created_at,
+            ),
+        )
+
+        event_id = cursor.lastrowid
+
+        for participant_steam_id in set(participant_steam_ids):
+            connection.execute(
+                """
+                INSERT INTO event_participants (
+                    event_id,
+                    participant_steam_id
+                )
+                VALUES (?, ?)
+                """,
+                (event_id, participant_steam_id),
+            )
+
+    return event_id
 

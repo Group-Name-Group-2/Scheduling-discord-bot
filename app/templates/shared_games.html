@@ -132,7 +132,11 @@
         </nav>
     </main>
 
-    <dialog id="game-modal" class="game-modal">
+    <dialog
+        id="game-modal"
+        class="game-modal"
+        data-friend-ids="{{ selected_friend_ids | join(',') }}"
+    >
         <div class="game-modal-content">
             <button
                 type="button"
@@ -171,7 +175,8 @@
                     <button
                         type="button"
                         class="button"
-                        onclick="window.location.href='/events'">
+                        id="modal-create-event"
+                    >
                         Create Event
                     </button>
                 </div>
