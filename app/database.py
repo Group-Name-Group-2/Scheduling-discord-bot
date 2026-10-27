@@ -287,3 +287,34 @@ def save_game_night_event(
             )
 
     return event_id
+
+def get_calendar_events(steam_id: str) -> list[dict]:
+    with get_connection() as connection:
+        connection.row_factory = sqlite3.Row
+
+        rows = connection.execute(
+            """
+            SELECT
+                e.event_id,
+                e.creator_steam_id,
+                e.app_id,
+                g.name AS game_name,
+                e.event_date,
+                e.event_time,
+                e.duration_minutes
+            FROM game_night_events e
+            JOIN games g ON g.app_id = e.app_id
+            WHERE
+                e.creator_steam_id = ?
+                OR EXISTS (
+                    SELECT 1
+                    FROM event_participants ep
+                    WHERE ep.event_id = e.event_id
+                    AND ep.participant_steam_id = ?
+                )
+            ORDER BY e.event_date, e.event_time
+            """,
+            (steam_id, steam_id),
+        ).fetchall()
+
+        return [dict(row) for row in rows]

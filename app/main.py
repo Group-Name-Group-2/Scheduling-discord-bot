@@ -1,7 +1,7 @@
 import os
 import requests
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
-from database import get_saved_games, get_saved_friends, save_game_night_event
+from database import get_saved_games, get_saved_friends, save_game_night_event, get_calendar_events
 from steam_auth import router as steam_auth_router
 from steam_api import get_game_details, get_player_summaries
 
@@ -76,6 +76,44 @@ def events(request: Request):
         name="events.html",
         context={}
     )
+
+@app.get("/api/events")
+def get_events(request: Request):
+    steam_id = request.session.get("steam_id")
+
+    if not steam_id:
+        return JSONResponse(
+            {"error": "Please sign in with Steam first."},
+            status_code=401,
+        )
+
+    saved_events = get_calendar_events(steam_id)
+
+    calendar_events = []
+
+    for event in saved_events:
+        start_datetime = datetime.strptime(
+            f"{event['event_date']} {event['event_time']}",
+            "%Y-%m-%d %H:%M",
+        )
+
+        end_datetime = start_datetime + timedelta(
+            minutes=event["duration_minutes"]
+        )
+
+        calendar_events.append({
+            "id": event["event_id"],
+            "title": event["game_name"],
+            "start": start_datetime.isoformat(),
+            "end": end_datetime.isoformat(),
+            "extendedProps": {
+                "appId": event["app_id"],
+                "creatorSteamId": event["creator_steam_id"],
+                "duration": event["duration_minutes"],
+            },
+        })
+
+    return JSONResponse(calendar_events)
 
 @app.get("/events/create")
 def create_event_page(request: Request):
