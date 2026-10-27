@@ -318,3 +318,59 @@ def get_calendar_events(steam_id: str) -> list[dict]:
         ).fetchall()
 
         return [dict(row) for row in rows]
+
+
+def get_event_details_for_user(
+    event_id: int,
+    steam_id: str,
+) -> dict | None:
+    with get_connection() as connection:
+        connection.row_factory = sqlite3.Row
+
+        event = connection.execute(
+            """
+            SELECT
+                e.event_id,
+                e.creator_steam_id,
+                e.app_id,
+                g.name AS game_name,
+                e.event_date,
+                e.event_time,
+                e.duration_minutes
+            FROM game_night_events e
+            JOIN games g ON g.app_id = e.app_id
+            WHERE
+                e.event_id = ?
+                AND (
+                    e.creator_steam_id = ?
+                    OR EXISTS (
+                        SELECT 1
+                        FROM event_participants ep
+                        WHERE ep.event_id = e.event_id
+                        AND ep.participant_steam_id = ?
+                    )
+                )
+            """,
+            (event_id, steam_id, steam_id),
+        ).fetchone()
+
+        if event is None:
+            return None
+
+        participants = connection.execute(
+            """
+            SELECT participant_steam_id
+            FROM event_participants
+            WHERE event_id = ?
+            ORDER BY participant_steam_id
+            """,
+            (event_id,),
+        ).fetchall()
+
+        result = dict(event)
+        result["participant_steam_ids"] = [
+            row["participant_steam_id"]
+            for row in participants
+        ]
+
+        return result

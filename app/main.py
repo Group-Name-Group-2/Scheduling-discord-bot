@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
-from database import get_saved_games, get_saved_friends, save_game_night_event, get_calendar_events
+from database import get_saved_games, get_saved_friends, save_game_night_event, get_calendar_events, get_event_details_for_user
 from steam_auth import router as steam_auth_router
 from steam_api import get_game_details, get_player_summaries
 
@@ -169,6 +169,7 @@ def create_event_page(request: Request):
             "game_id": request.query_params.get("game_id", ""),
             "game_name": request.query_params.get("game_name", ""),
             "date": request.query_params.get("date", ""),
+            "today": datetime.now().date().isoformat(),
             "friend_ids": selected_friend_ids,
         },
     )
@@ -216,11 +217,26 @@ async def create_event(request: Request):
 
     # Validate the date and time formats.
     try:
-        datetime.strptime(event_date, "%Y-%m-%d")
+        selected_date = datetime.strptime(
+            event_date, "%Y-%m-%d"
+        ).date()
+
         datetime.strptime(event_time, "%H:%M")
-    except ValueError:
+    except (ValueError, TypeError):
         return JSONResponse(
             {"error": "Please enter a valid date and start time."},
+            status_code=400,
+        )
+
+    # Prevent events from being created on past dates.
+    if selected_date < datetime.now().date():
+        return JSONResponse(
+            {
+                "error": (
+                    "You cannot create an event on a date "
+                    "that has already passed."
+                )
+            },
             status_code=400,
         )
 
@@ -276,4 +292,64 @@ async def create_event(request: Request):
         "success": True,
         "event_id": event_id,
         "message": "Your game night was created successfully!",
+    })
+
+@app.get("/api/events/{event_id}")
+def event_details(event_id: int, request: Request):
+    steam_id = request.session.get("steam_id")
+
+    if not steam_id:
+        return JSONResponse(
+            {"error": "Please sign in with Steam first."},
+            status_code=401,
+        )
+
+    event = get_event_details_for_user(event_id, steam_id)
+
+    if event is None:
+        return JSONResponse(
+            {"error": "Event not found or you do not have access to it."},
+            status_code=404,
+        )
+
+    # Retrieve the creator's and participants' Steam profiles.
+    profile_ids = list(dict.fromkeys(
+        [event["creator_steam_id"]]
+        + event["participant_steam_ids"]
+    ))
+
+    try:
+        profiles = get_player_summaries(profile_ids)
+    except requests.RequestException:
+        profiles = {}
+
+    creator_profile = profiles.get(event["creator_steam_id"], {})
+
+    participants = []
+
+    for participant_id in event["participant_steam_ids"]:
+        profile = profiles.get(participant_id, {})
+
+        participants.append({
+            "steam_id": participant_id,
+            "name": profile.get("personaname", participant_id),
+            "avatar": profile.get("avatarfull", ""),
+        })
+
+    return JSONResponse({
+        "event_id": event["event_id"],
+        "game_name": event["game_name"],
+        "app_id": event["app_id"],
+        "date": event["event_date"],
+        "time": event["event_time"],
+        "duration_minutes": event["duration_minutes"],
+        "creator": {
+            "steam_id": event["creator_steam_id"],
+            "name": creator_profile.get(
+                "personaname",
+                event["creator_steam_id"],
+            ),
+            "avatar": creator_profile.get("avatarfull", ""),
+        },
+        "participants": participants,
     })

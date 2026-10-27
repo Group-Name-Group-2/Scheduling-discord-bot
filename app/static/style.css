@@ -763,3 +763,65 @@ ul.game-list .game-item p {
 .event-participant span {
     overflow-wrap: anywhere;
 }
+
+.event-modal-details {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 18px;
+}
+
+.event-detail-row {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #303e50;
+    overflow-wrap: anywhere;
+}
+
+.event-detail-label {
+    color: #aebdca;
+    font-size: 0.85rem;
+}
+
+.event-detail-section {
+    margin-top: 8px;
+}
+
+.event-detail-section h3 {
+    margin: 0 0 10px;
+    color: #c7d0d9;
+    font-size: 1rem;
+}
+
+.event-detail-section p {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.event-participant-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.event-participant-list li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    color: #ffffff;
+    overflow-wrap: anywhere;
+}
+
+.event-participant-list img {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+}
