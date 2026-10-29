@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Account Settings{% endblock %}
+
+{% block content %}
+<h2>User Account Profile</h2>
+
+<section>
+    <h3>Profile Information</h3>
+    <p><strong>Username:</strong> {{ user.username }}</p>
+    <p><strong>Email:</strong> {{ user.email }}</p>
+    <p><strong>Joined:</strong> {{ user.created_at.strftime('%Y-%m-%d') }}</p>
+
+    <form method="POST" action="{{ url_for('auth.account') }}">
+        <input type="hidden" name="action" value="update_profile">
+
+        <label for="steam_id">Steam ID</label>
+        <input type="text" id="steam_id" name="steam_id" value="{{ user.steam_id or '' }}">
+
+        <label for="avatar_url">Avatar Image URL</label>
+        <input type="url" id="avatar_url" name="avatar_url" value="{{ user.avatar_url or '' }}">
+
+        <button type="submit">Save Profile Changes</button>
+    </form>
+</section>
+
+<hr>
+
+<section>
+    <h3>Change Password</h3>
+    <form method="POST" action="{{ url_for('auth.account') }}">
+        <input type="hidden" name="action" value="change_password">
+
+        <label for="old_password">Current Password</label>
+        <input type="password" id="old_password" name="old_password" required>
+
+        <label for="new_password">New Password</label>
+        <input type="password" id="new_password" name="new_password" required>
+
+        <button type="submit">Update Password</button>
+    </form>
+</section>
+{% endblock %}
