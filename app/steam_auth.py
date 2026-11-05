@@ -114,11 +114,28 @@ async def steam_callback(request: Request):
             detail=str(error),
         ) from error
 
-        # Remember the verified Steam account in the session.
+    # Remember the verified Steam account in the session.
     request.session["steam_id"] = steam_id
+
+    # Save the display name and avatar for the navbar. Not critical,
+    # so a failed lookup just falls back to a generic label.
+    try:
+        profile = get_player_summaries([steam_id]).get(steam_id, {})
+    except requests.RequestException:
+        profile = {}
+
+    request.session["steam_name"] = profile.get("personaname")
+    request.session["steam_avatar"] = profile.get("avatarmedium")
 
     # Redirect to the separate library page.
     return RedirectResponse(url="/library", status_code=303)
+
+@router.post("/auth/logout")
+async def logout(request: Request):
+    # Clears the Steam and email login from the session cookie.
+    request.session.clear()
+    return {"message": "You have been signed out."}
+
 
 @router.get("/library")
 async def library(request: Request):

@@ -1,0 +1,24 @@
+<footer class="site-footer">
+    <div class="site-footer-inner">
+        <div class="site-footer-brand">
+            <strong>Game Night</strong>
+            <p>Plan game nights with your Steam friends.</p>
+        </div>
+
+        <nav class="site-footer-links" aria-label="Footer">
+            {% if request.session.get("steam_id") %}
+                <a href="/library">Library</a>
+                <a href="/shared-games">Shared Games</a>
+                <a href="/events">Events</a>
+                <a href="/messages">Messages</a>
+            {% else %}
+                <a href="/auth/steam">Sign in with Steam</a>
+            {% endif %}
+        </nav>
+    </div>
+
+    <p class="site-footer-legal">
+        Not affiliated with Valve Corporation. Steam and the Steam logo are
+        trademarks of Valve Corporation.
+    </p>
+</footer>

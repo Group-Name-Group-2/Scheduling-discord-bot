@@ -77,7 +77,22 @@ def init_db():
                     REFERENCES game_night_events(event_id)
                     ON DELETE CASCADE
             );
-        
+
+            CREATE TABLE IF NOT EXISTS messages (
+                message_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sender_steam_id TEXT NOT NULL,
+                recipient_steam_id TEXT NOT NULL,
+                body TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                read_at TEXT
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_messages_pair
+                ON messages (sender_steam_id, recipient_steam_id, message_id);
+
+            CREATE INDEX IF NOT EXISTS idx_messages_recipient_unread
+                ON messages (recipient_steam_id, read_at);
+
         """)
 
 
@@ -374,3 +389,188 @@ def get_event_details_for_user(
         ]
 
         return result
+
+# =========================
+# Direct messages
+# =========================
+
+MAX_MESSAGE_LENGTH = 2000
+
+
+def _message_row_to_dict(row) -> dict:
+    return {
+        "message_id": row[0],
+        "sender_steam_id": row[1],
+        "recipient_steam_id": row[2],
+        "body": row[3],
+        "created_at": row[4],
+        "read_at": row[5],
+    }
+
+
+def save_message(sender_steam_id: str, recipient_steam_id: str, body: str) -> dict:
+    init_db()
+
+    created_at = datetime.now(timezone.utc).isoformat()
+
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            INSERT INTO messages (
+                sender_steam_id, recipient_steam_id, body, created_at
+            )
+            VALUES (?, ?, ?, ?)
+            """,
+            (sender_steam_id, recipient_steam_id, body, created_at),
+        )
+        message_id = cursor.lastrowid
+
+    return {
+        "message_id": message_id,
+        "sender_steam_id": sender_steam_id,
+        "recipient_steam_id": recipient_steam_id,
+        "body": body,
+        "created_at": created_at,
+        "read_at": None,
+    }
+
+
+def get_conversation(
+    steam_id: str,
+    other_steam_id: str,
+    after_id: int = 0,
+    limit: int = 200,
+) -> list[dict]:
+    """
+    Messages between two users, oldest first. With after_id, only
+    messages newer than that ID (used for polling).
+    """
+    init_db()
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT * FROM (
+                SELECT
+                    message_id, sender_steam_id, recipient_steam_id,
+                    body, created_at, read_at
+                FROM messages
+                WHERE (
+                    (sender_steam_id = ? AND recipient_steam_id = ?)
+                    OR (sender_steam_id = ? AND recipient_steam_id = ?)
+                )
+                AND message_id > ?
+                ORDER BY message_id DESC
+                LIMIT ?
+            )
+            ORDER BY message_id ASC
+            """,
+            (steam_id, other_steam_id, other_steam_id, steam_id, after_id, limit),
+        ).fetchall()
+
+    return [_message_row_to_dict(row) for row in rows]
+
+
+def mark_conversation_read(steam_id: str, other_steam_id: str) -> None:
+    """Mark every message other_steam_id sent to steam_id as read."""
+    init_db()
+
+    read_at = datetime.now(timezone.utc).isoformat()
+
+    with get_connection() as connection:
+        connection.execute(
+            """
+            UPDATE messages
+            SET read_at = ?
+            WHERE sender_steam_id = ?
+              AND recipient_steam_id = ?
+              AND read_at IS NULL
+            """,
+            (read_at, other_steam_id, steam_id),
+        )
+
+
+def get_conversation_summaries(steam_id: str) -> list[dict]:
+    """
+    One entry per person steam_id has exchanged messages with:
+    the latest message and how many unread messages they sent.
+    Most recent conversation first.
+    """
+    init_db()
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            WITH mine AS (
+                SELECT
+                    message_id, sender_steam_id, recipient_steam_id,
+                    body, created_at, read_at,
+                    CASE WHEN sender_steam_id = ?
+                         THEN recipient_steam_id
+                         ELSE sender_steam_id
+                    END AS other_id
+                FROM messages
+                WHERE sender_steam_id = ? OR recipient_steam_id = ?
+            )
+            SELECT
+                m.other_id,
+                m.body,
+                m.created_at,
+                m.sender_steam_id,
+                (
+                    SELECT COUNT(*) FROM mine u
+                    WHERE u.other_id = m.other_id
+                      AND u.recipient_steam_id = ?
+                      AND u.read_at IS NULL
+                ) AS unread_count
+            FROM mine m
+            WHERE m.message_id = (
+                SELECT MAX(message_id) FROM mine x WHERE x.other_id = m.other_id
+            )
+            ORDER BY m.message_id DESC
+            """,
+            (steam_id, steam_id, steam_id, steam_id),
+        ).fetchall()
+
+    return [
+        {
+            "steamid": row[0],
+            "last_body": row[1],
+            "last_created_at": row[2],
+            "last_from_me": row[3] == steam_id,
+            "unread_count": row[4],
+        }
+        for row in rows
+    ]
+
+
+def has_messaged(sender_steam_id: str, recipient_steam_id: str) -> bool:
+    """True if sender_steam_id has ever sent recipient_steam_id a message."""
+    init_db()
+
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT 1 FROM messages
+            WHERE sender_steam_id = ? AND recipient_steam_id = ?
+            LIMIT 1
+            """,
+            (sender_steam_id, recipient_steam_id),
+        ).fetchone()
+
+    return row is not None
+
+
+def get_unread_message_count(steam_id: str) -> int:
+    init_db()
+
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT COUNT(*) FROM messages
+            WHERE recipient_steam_id = ? AND read_at IS NULL
+            """,
+            (steam_id,),
+        ).fetchone()
+
+    return row[0]

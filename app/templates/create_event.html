@@ -7,6 +7,9 @@
 
     <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
     <script src="{{ url_for('static', path='create_event.js') }}" defer></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
     {% include "navbar.html" %}
@@ -43,7 +46,7 @@
                     <input
                         type="date"
                         id="event-date"
-                        name="event_date"
+                        name="date"
                         value="{{ date }}"
                         min="{{ today }}"
                         required
@@ -117,5 +120,7 @@
             <p id="event-form-message" class="muted-text" role="status"></p>
         </form>
     </main>
+
+    {% include "footer.html" %}
 </body>
 </html>

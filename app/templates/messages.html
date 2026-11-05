@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Messages | Game Night</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', path='style.css') }}"
+    >
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    {% include "navbar.html" %}
+
+    <main class="container">
+        <h1>Messages</h1>
+
+        <section class="results-section">
+            <h2>Conversations</h2>
+
+            {% if conversations %}
+                <ul class="conversation-list">
+                    {% for convo in conversations %}
+                        <li>
+                            <a
+                                class="conversation-item{% if convo.unread_count %} has-unread{% endif %}"
+                                href="/messages/{{ convo.steamid }}"
+                            >
+                                {% if convo.avatar %}
+                                    <img
+                                        src="{{ convo.avatar }}"
+                                        alt=""
+                                        width="48"
+                                        height="48"
+                                        loading="lazy"
+                                    >
+                                {% endif %}
+
+                                <div class="conversation-text">
+                                    <strong>{{ convo.name }}</strong>
+                                    <span class="muted-text conversation-preview">
+                                        {% if convo.last_from_me %}You: {% endif %}{{ convo.last_body }}
+                                    </span>
+                                </div>
+
+                                {% if convo.unread_count %}
+                                    <span class="unread-badge" aria-label="{{ convo.unread_count }} unread">
+                                        {{ convo.unread_count }}
+                                    </span>
+                                {% endif %}
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <div class="empty-state">
+                    <p>No conversations yet. Pick a friend below to start one.</p>
+                </div>
+            {% endif %}
+        </section>
+
+        <section class="results-section">
+            <h2>Start a new conversation</h2>
+
+            {% if new_chat_friends %}
+                <div class="friend-list">
+                    {% for friend in new_chat_friends %}
+                        <a class="friend-card" href="/messages/{{ friend.steamid }}">
+                            {% if friend.avatar %}
+                                <img
+                                    src="{{ friend.avatar }}"
+                                    alt=""
+                                    width="64"
+                                    height="64"
+                                    loading="lazy"
+                                >
+                            {% endif %}
+                            <span>{{ friend.name }}</span>
+                        </a>
+                    {% endfor %}
+                </div>
+            {% elif not conversations %}
+                <div class="empty-state">
+                    <p>
+                        No saved friends yet. Open the
+                        <a href="/friends">Friends</a> page to load your Steam
+                        friends list.
+                    </p>
+                </div>
+            {% else %}
+                <p class="muted-text">You've messaged all of your saved friends.</p>
+            {% endif %}
+        </section>
+    </main>
+
+    {% include "footer.html" %}
+</body>
+</html>

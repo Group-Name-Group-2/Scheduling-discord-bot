@@ -36,7 +36,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             });
 
-            const result = await response.json();
+            // The server may return plain text (e.g. "Internal Server
+            // Error") if it crashes, so don't assume the body is JSON.
+            let result = {};
+            try {
+                result = await response.json();
+            } catch {
+                result = {
+                    error: `Server error (${response.status}). Please try again.`
+                };
+            }
 
             if (!response.ok) {
                 throw new Error(
