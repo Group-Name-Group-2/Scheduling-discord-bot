@@ -7,5 +7,21 @@
         <a href="/friends">Friends</a>
         <a href="/shared-games">Shared Games</a>
         <a href="/events">Events</a>
+
+        {% if current_user_email or steam_id %}
+            <span class="navbar-user">{{ current_user_email or steam_id }}</span>
+            <button id="navbar-logout-button" type="button">Sign out</button>
+        {% else %}
+            <a href="/login">Sign in</a>
+        {% endif %}
     </div>
 </nav>
+
+{% if current_user_email or steam_id %}
+<script>
+    document.getElementById("navbar-logout-button").addEventListener("click", async () => {
+        await fetch("/auth/logout", { method: "POST" });
+        window.location.href = "/";
+    });
+</script>
+{% endif %}
