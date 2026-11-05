@@ -1,20 +1,18 @@
 """
 auth_email_routes.py
 
-HTTP routes for email magic-link sign-in. Wired into main.py the same
-way steam_auth_router already is:
-
-    from auth_email_routes import router as email_auth_router
-    app.include_router(email_auth_router)
+HTTP routes for email magic-link sign-in.
 """
 
 from pathlib import Path
 
+import requests
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from auth_email import request_magic_link, verify_magic_link
+from steam_api import get_player_summaries
 
 router = APIRouter()
 
@@ -24,8 +22,6 @@ templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
 @router.get("/login")
 def login_page(request: Request):
-    # If the person is already signed in via either method, send them
-    # straight to the app instead of showing the sign-in form again.
     if request.session.get("steam_id") or request.session.get("email"):
         return RedirectResponse(url="/events", status_code=303)
 
@@ -42,7 +38,7 @@ def login_page(request: Request):
 @router.post("/auth/email/request")
 async def request_email_login(request: Request):
     form = await request.form()
-    email = form.get("email", "")
+    email = str(form.get("email", "")).strip()
 
     base_url = str(request.base_url).rstrip("/")
     ok, message = request_magic_link(email, base_url)
@@ -55,12 +51,27 @@ async def request_email_login(request: Request):
 
 @router.get("/auth/email/verify")
 def verify_email_login(request: Request, token: str = ""):
-    email = verify_magic_link(token)
+    result = verify_magic_link(token)
 
-    if email is None:
+    if result is None:
         return RedirectResponse(url="/login?error=invalid_token", status_code=303)
 
+    # Establish full user session upon magic link verification
+    steam_id = result["steam_id"]
+    email = result["email"]
+
+    request.session["steam_id"] = steam_id
     request.session["email"] = email
+
+    # Fetch display name & avatar for navigation bar display
+    try:
+        profile = get_player_summaries([steam_id]).get(steam_id, {})
+    except requests.RequestException:
+        profile = {}
+
+    request.session["steam_name"] = profile.get("personaname")
+    request.session["steam_avatar"] = profile.get("avatarmedium")
+
     return RedirectResponse(url="/events", status_code=303)
 
 
