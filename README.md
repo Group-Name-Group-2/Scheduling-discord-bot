@@ -20,3 +20,7 @@ install discord bot to server
 
 ```
 
+#run
+install uvicorn
+winget install --id astral-sh.uv -e
+restart shell
