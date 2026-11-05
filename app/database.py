@@ -93,6 +93,16 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_messages_recipient_unread
                 ON messages (recipient_steam_id, read_at);
 
+            CREATE TABLE IF NOT EXISTS user_settings (
+                steam_id TEXT PRIMARY KEY,
+                email TEXT,
+                notify_messages INTEGER NOT NULL DEFAULT 1,
+                pending_email TEXT,
+                verify_token_hash TEXT,
+                verify_token_expires TEXT,
+                verify_sent_at TEXT
+            );
+
         """)
 
 
@@ -571,6 +581,163 @@ def get_unread_message_count(steam_id: str) -> int:
             WHERE recipient_steam_id = ? AND read_at IS NULL
             """,
             (steam_id,),
+        ).fetchone()
+
+    return row[0]
+
+
+# =========================
+# User settings (email + notifications)
+# =========================
+
+def get_user_settings(steam_id: str) -> dict:
+    """
+    Settings for a Steam user. `email` is only set once verified;
+    `pending_email` is an address waiting for its verification link.
+    """
+    init_db()
+
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT email, notify_messages, pending_email,
+                   verify_token_expires, verify_sent_at
+            FROM user_settings
+            WHERE steam_id = ?
+            """,
+            (steam_id,),
+        ).fetchone()
+
+    if row is None:
+        return {
+            "email": None,
+            "notify_messages": True,
+            "pending_email": None,
+            "verify_token_expires": None,
+            "verify_sent_at": None,
+        }
+
+    return {
+        "email": row[0],
+        "notify_messages": bool(row[1]),
+        "pending_email": row[2],
+        "verify_token_expires": row[3],
+        "verify_sent_at": row[4],
+    }
+
+
+def _ensure_settings_row(connection, steam_id: str) -> None:
+    connection.execute(
+        "INSERT OR IGNORE INTO user_settings (steam_id) VALUES (?)",
+        (steam_id,),
+    )
+
+
+def set_pending_email(
+    steam_id: str,
+    email: str,
+    token_hash: str,
+    expires_at: str,
+) -> None:
+    init_db()
+
+    sent_at = datetime.now(timezone.utc).isoformat()
+
+    with get_connection() as connection:
+        _ensure_settings_row(connection, steam_id)
+        connection.execute(
+            """
+            UPDATE user_settings
+            SET pending_email = ?,
+                verify_token_hash = ?,
+                verify_token_expires = ?,
+                verify_sent_at = ?
+            WHERE steam_id = ?
+            """,
+            (email, token_hash, expires_at, sent_at, steam_id),
+        )
+
+
+def confirm_pending_email(token_hash: str) -> dict | None:
+    """
+    If token_hash matches an unexpired verification, make the pending
+    address the account's email. Returns {steam_id, email} or None.
+    """
+    init_db()
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT steam_id, pending_email
+            FROM user_settings
+            WHERE verify_token_hash = ?
+              AND verify_token_expires > ?
+              AND pending_email IS NOT NULL
+            """,
+            (token_hash, now),
+        ).fetchone()
+
+        if row is None:
+            return None
+
+        connection.execute(
+            """
+            UPDATE user_settings
+            SET email = pending_email,
+                pending_email = NULL,
+                verify_token_hash = NULL,
+                verify_token_expires = NULL
+            WHERE steam_id = ?
+            """,
+            (row[0],),
+        )
+
+    return {"steam_id": row[0], "email": row[1]}
+
+
+def remove_user_email(steam_id: str) -> None:
+    init_db()
+
+    with get_connection() as connection:
+        connection.execute(
+            """
+            UPDATE user_settings
+            SET email = NULL,
+                pending_email = NULL,
+                verify_token_hash = NULL,
+                verify_token_expires = NULL
+            WHERE steam_id = ?
+            """,
+            (steam_id,),
+        )
+
+
+def set_notify_messages(steam_id: str, enabled: bool) -> None:
+    init_db()
+
+    with get_connection() as connection:
+        _ensure_settings_row(connection, steam_id)
+        connection.execute(
+            "UPDATE user_settings SET notify_messages = ? WHERE steam_id = ?",
+            (1 if enabled else 0, steam_id),
+        )
+
+
+def count_unread_from(sender_steam_id: str, recipient_steam_id: str) -> int:
+    """Unread messages sender_steam_id has sent to recipient_steam_id."""
+    init_db()
+
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT COUNT(*) FROM messages
+            WHERE sender_steam_id = ?
+              AND recipient_steam_id = ?
+              AND read_at IS NULL
+            """,
+            (sender_steam_id, recipient_steam_id),
         ).fetchone()
 
     return row[0]

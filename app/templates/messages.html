@@ -20,6 +20,28 @@
     <main class="container">
         <h1>Messages</h1>
 
+        {% if not user_settings.email %}
+            <div class="email-prompt">
+                <div class="email-prompt-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></g></svg>
+                </div>
+
+                <div class="email-prompt-text">
+                    {% if user_settings.pending_email %}
+                        <strong>Almost done: confirm your email</strong>
+                        <p>We sent a verification link to {{ user_settings.pending_email }}. Open it to start getting message notifications.</p>
+                    {% else %}
+                        <strong>Never miss a message</strong>
+                        <p>Add an email address and we'll let you know when a friend messages you.</p>
+                    {% endif %}
+                </div>
+
+                <a class="button" href="/settings#email-heading">
+                    {% if user_settings.pending_email %}Resend or change{% else %}Add email address{% endif %}
+                </a>
+            </div>
+        {% endif %}
+
         <section class="results-section">
             <h2>Conversations</h2>
 

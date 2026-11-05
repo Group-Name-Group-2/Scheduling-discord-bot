@@ -43,14 +43,18 @@
 
             <div class="navbar-account">
                 {% if nav_user %}
+                    {% if nav_steam_id %}
+                    <a class="navbar-user{% if path.startswith('/settings') %} active{% endif %}" href="/settings" title="Account settings">
+                    {% else %}
                     <span class="navbar-user">
+                    {% endif %}
                         {% if session.get("steam_avatar") %}
                             <img src="{{ session.get('steam_avatar') }}" alt="" width="28" height="28">
                         {% else %}
                             <span class="navbar-user-initial" aria-hidden="true">{{ nav_name[:1] | upper }}</span>
                         {% endif %}
                         <span class="navbar-user-name">{{ nav_name }}</span>
-                    </span>
+                    {% if nav_steam_id %}</a>{% else %}</span>{% endif %}
                     <button id="navbar-logout-button" class="button button-ghost button-small" type="button">Sign out</button>
                 {% else %}
                     <a class="button button-small" href="/auth/steam">Sign in with Steam</a>

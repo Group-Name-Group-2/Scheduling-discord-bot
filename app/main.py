@@ -12,6 +12,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from database import get_saved_games, get_saved_friends, save_game_night_event, get_calendar_events, get_event_details_for_user
 from steam_auth import router as steam_auth_router
 from messages_routes import router as messages_router
+from settings_routes import router as settings_router
 from steam_api import get_game_details, get_player_summaries
 
 
@@ -34,6 +35,7 @@ app.add_middleware(
 
 app.include_router(steam_auth_router)
 app.include_router(messages_router)
+app.include_router(settings_router)
 
 app.mount(
     "/static",

@@ -12,7 +12,7 @@ Rules:
 from pathlib import Path
 
 import requests
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, BackgroundTasks, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -22,10 +22,13 @@ from database import (
     get_conversation_summaries,
     get_saved_friends,
     get_unread_message_count,
+    get_user_settings,
     has_messaged,
     mark_conversation_read,
     save_message,
 )
+from email_service import app_base_url
+from notifications import mark_viewing, notify_new_message
 from steam_api import get_player_summaries
 
 router = APIRouter()
@@ -83,6 +86,7 @@ def messages_inbox(request: Request):
             "steam_id": steam_id,
             "conversations": conversations,
             "new_chat_friends": new_chat_friends,
+            "user_settings": get_user_settings(steam_id),
         },
     )
 
@@ -99,6 +103,7 @@ def conversation_page(request: Request, other_steam_id: str):
 
     messages = get_conversation(steam_id, other_steam_id)
     mark_conversation_read(steam_id, other_steam_id)
+    mark_viewing(steam_id, other_steam_id)
 
     profile = _profiles([other_steam_id]).get(other_steam_id, {})
 
@@ -118,7 +123,11 @@ def conversation_page(request: Request, other_steam_id: str):
 
 
 @router.post("/messages/{other_steam_id}")
-async def send_message(request: Request, other_steam_id: str):
+async def send_message(
+    request: Request,
+    other_steam_id: str,
+    background_tasks: BackgroundTasks,
+):
     steam_id = request.session.get("steam_id")
 
     if not steam_id:
@@ -146,6 +155,17 @@ async def send_message(request: Request, other_steam_id: str):
 
     message = save_message(steam_id, other_steam_id, body)
 
+    # Email the recipient after the response is sent, so a slow or
+    # failing mail server never delays or breaks the chat.
+    background_tasks.add_task(
+        notify_new_message,
+        sender_steam_id=steam_id,
+        sender_name=request.session.get("steam_name") or "A friend",
+        recipient_steam_id=other_steam_id,
+        body=body,
+        base_url=app_base_url(str(request.base_url)),
+    )
+
     return JSONResponse({"message": message})
 
 
@@ -163,6 +183,7 @@ def poll_messages(request: Request, other_steam_id: str, after: int = 0):
         return JSONResponse({"error": "Conversation not found."}, status_code=404)
 
     messages = get_conversation(steam_id, other_steam_id, after_id=after)
+    mark_viewing(steam_id, other_steam_id)
 
     if any(m["sender_steam_id"] == other_steam_id for m in messages):
         mark_conversation_read(steam_id, other_steam_id)

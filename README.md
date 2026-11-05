@@ -20,3 +20,13 @@ save forwarding url
 on app page on general info go to interactive endpoint url and paste forwarding url and append /interactions
 ```
 
+#run
+install uvicorn
+winget install --id astral-sh.uv -e
+restart shell
+cd to app folder
+uv venv
+#might have to run after the next command
+.venv\Scripts\Activate.ps1
+uv pip install -r requirements.txt
+uvicorn main:app --reload
