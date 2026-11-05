@@ -249,8 +249,25 @@ async def shared_games_page(request: Request):
     if not steam_id:
         return RedirectResponse(url="/", status_code=303)
 
-    # Get the user's saved friends.
+    # Get the user's saved friends. If none are saved yet (e.g. the
+    # Friends page was never opened), fetch the list from Steam.
     friends = get_saved_friends(steam_id)
+    friends_message = None
+
+    if not friends:
+        try:
+            steam_friends = get_friends_list(steam_id)
+        except (requests.RequestException, RuntimeError):
+            steam_friends = None
+
+        if steam_friends:
+            save_friends(steam_id, steam_friends)
+            friends = get_saved_friends(steam_id)
+        else:
+            friends_message = (
+                "Could not load your Steam friends. Make sure your "
+                "Steam friends list is set to public."
+            )
 
     # Read the friend IDs selected in the form.
     requested_friend_ids = request.query_params.getlist("friend_ids")
@@ -285,10 +302,29 @@ async def shared_games_page(request: Request):
     # Only calculate shared games after friends have been selected.
     games = []
     has_compared = bool(selected_friend_ids)
+    compared_friend_ids = []
+    unavailable_friends = []
 
     if has_compared:
-        steam_ids = [steam_id] + selected_friend_ids
-        games = get_shared_games(steam_ids)
+        names = {friend["steamid"]: friend["name"] for friend in friends}
+
+        # Refresh each selected friend's library from Steam so the
+        # comparison doesn't rely on libraries saved earlier (or never).
+        for friend_id in selected_friend_ids:
+            try:
+                available = sync_friend_library(friend_id)["available"]
+            except (requests.RequestException, RuntimeError):
+                available = bool(get_saved_games(friend_id))
+
+            if available:
+                compared_friend_ids.append(friend_id)
+            else:
+                unavailable_friends.append(names.get(friend_id, friend_id))
+
+        # Skip friends whose library is private, otherwise nobody
+        # would "own" any game and the result would always be empty.
+        if compared_friend_ids:
+            games = get_shared_games([steam_id] + compared_friend_ids)
 
     return templates.TemplateResponse(
         request=request,
@@ -298,8 +334,10 @@ async def shared_games_page(request: Request):
             "friends": friends,
             "selected_friend_ids": selected_friend_ids,
             "games": games,
-            "friend_count": len(selected_friend_ids),
+            "friend_count": len(compared_friend_ids),
             "has_compared": has_compared,
+            "friends_message": friends_message,
+            "unavailable_friends": unavailable_friends,
         },
     )
 

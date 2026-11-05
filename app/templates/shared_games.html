@@ -26,6 +26,10 @@
             with your own. Private or unavailable libraries may not be shown.
         </p>
 
+        {% if friends_message %}
+            <p class="muted-text">{{ friends_message }}</p>
+        {% endif %}
+
         <form action="/shared-games" method="get">
             <div class="friend-list">
                 {% for friend in friends %}
@@ -67,6 +71,13 @@
                     Comparing your library with
                     {{ friend_count }} selected friend(s).
                 </p>
+
+                {% if unavailable_friends %}
+                    <p class="muted-text">
+                        Skipped (library private or unavailable):
+                        {{ unavailable_friends | join(", ") }}
+                    </p>
+                {% endif %}
 
                 <p>
                     {{ games | length }} games owned by everyone selected.
