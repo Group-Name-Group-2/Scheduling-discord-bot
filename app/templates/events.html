@@ -24,6 +24,9 @@
         src="{{ url_for('static', path='events.js') }}"
         defer
     ></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 
 <body>
@@ -42,6 +45,63 @@
         <section class="calendar-panel">
             <div id="calendar"></div>
         </section>
+
+        <dialog id="event-details-modal" class="game-modal">
+            <div class="game-modal-content">
+                <button
+                    type="button"
+                    id="close-event-modal"
+                    class="game-modal-close"
+                    aria-label="Close event details"
+                >
+                    &times;
+                </button>
+
+                <img
+                    id="event-modal-cover"
+                    class="game-modal-cover"
+                    src=""
+                    alt=""
+                    hidden
+                >
+
+                <div class="game-modal-info">
+                    <h2 id="event-modal-title">Game Night</h2>
+
+                    <div class="event-modal-details">
+                        <div class="event-detail-row">
+                            <span class="event-detail-label">Date</span>
+                            <span id="event-modal-date"></span>
+                        </div>
+
+                        <div class="event-detail-row">
+                            <span class="event-detail-label">Time</span>
+                            <span id="event-modal-time"></span>
+                        </div>
+
+                        <div class="event-detail-row">
+                            <span class="event-detail-label">Duration</span>
+                            <span id="event-modal-duration"></span>
+                        </div>
+
+                        <div class="event-detail-section">
+                            <h3>Hosted by</h3>
+                            <p id="event-modal-creator"></p>
+                        </div>
+
+                        <div class="event-detail-section">
+                            <h3>Participants</h3>
+                            <ul
+                                id="event-modal-participants"
+                                class="event-participant-list"
+                            ></ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </dialog>
     </main>
+
+    {% include "footer.html" %}
 </body>
 </html>

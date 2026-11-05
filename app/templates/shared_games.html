@@ -13,6 +13,9 @@
         src="{{ url_for('static', path='script.js') }}"
         defer
     ></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 
 <body>
@@ -25,6 +28,10 @@
             Select the friends whose libraries you want to compare
             with your own. Private or unavailable libraries may not be shown.
         </p>
+
+        {% if friends_message %}
+            <p class="muted-text">{{ friends_message }}</p>
+        {% endif %}
 
         <form action="/shared-games" method="get">
             <div class="friend-list">
@@ -67,6 +74,13 @@
                     Comparing your library with
                     {{ friend_count }} selected friend(s).
                 </p>
+
+                {% if unavailable_friends %}
+                    <p class="muted-text">
+                        Skipped (library private or unavailable):
+                        {{ unavailable_friends | join(", ") }}
+                    </p>
+                {% endif %}
 
                 <p>
                     {{ games | length }} games owned by everyone selected.
@@ -132,7 +146,13 @@
         </nav>
     </main>
 
-    <dialog id="game-modal" class="game-modal">
+    {% include "footer.html" %}
+
+    <dialog
+        id="game-modal"
+        class="game-modal"
+        data-friend-ids="{{ selected_friend_ids | join(',') }}"
+    >
         <div class="game-modal-content">
             <button
                 type="button"
@@ -170,10 +190,11 @@
 
                     <button
                         type="button"
-                        id="create-event-button"
-                        disabled
-                        title="Event creation is not available yet"
-                    >Create Event (Coming Soon)</button>
+                        class="button"
+                        id="modal-create-event"
+                    >
+                        Create Event
+                    </button>
                 </div>
             </div>
         </div>

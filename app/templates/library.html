@@ -13,6 +13,9 @@
         src="{{ url_for('static', path='script.js') }}"
         defer
     ></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 
 <body>
@@ -21,9 +24,7 @@
     <main class="container">
         <h1>My Game Library</h1>
 
-        <p class="muted-text">
-            Connected Steam ID: {{ steam_id }}
-        </p>
+        <p class="page-subtitle">Every game on your Steam account. Select a game for details or to plan a game night.</p>
 
         {% if games %}
             <p>{{ games | length }} games found.</p>
@@ -80,6 +81,8 @@
         </nav>
     </main>
 
+    {% include "footer.html" %}
+
     <dialog id="game-modal" class="game-modal">
         <div class="game-modal-content">
             <button
@@ -118,11 +121,10 @@
 
                     <button
                         type="button"
-                        id="create-event-button"
-                        disabled
-                        title="Event creation is not available yet"
+                        class="button"
+                        id="modal-create-event"
                     >
-                        Create Event (Coming Soon)
+                        Create Event
                     </button>
                 </div>
             </div>

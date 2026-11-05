@@ -9,12 +9,14 @@
         rel="stylesheet"
         href="{{ url_for('static', path='style.css') }}"
     >
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
     <main class="container">
         <h1>Friend's Steam Library</h1>
 
-        <p>Friend's Steam ID: {{ friend_steam_id }}</p>
 
         {% if message %}
             <p>{{ message }}</p>
@@ -42,5 +44,7 @@
         <p><a href="/friends">Return to Steam Friends</a></p>
         <p><a href="/library">Return to your library</a></p>
     </main>
+
+    {% include "footer.html" %}
 </body>
 </html>

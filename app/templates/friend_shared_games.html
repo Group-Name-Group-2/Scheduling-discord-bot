@@ -13,6 +13,9 @@
         src="{{ url_for('static', path='script.js') }}"
         defer
     ></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 
 <body>
@@ -34,9 +37,7 @@
 
             <div>
                 <h2>You and {{ friend_name }}</h2>
-                <p class="muted-text">
-                    Steam ID: {{ friend_steam_id }}
-                </p>
+                <p class="muted-text">Games you can both play right now.</p>
             </div>
         </section>
 
@@ -100,7 +101,13 @@
         </nav>
     </main>
 
-    <dialog id="game-modal" class="game-modal">
+    {% include "footer.html" %}
+
+    <dialog
+    id="game-modal"
+    class="game-modal"
+    data-friend-ids="{{ friend_steam_id }}"
+    >
         <div class="game-modal-content">
             <button
                 type="button"
@@ -138,10 +145,11 @@
 
                     <button
                         type="button"
-                        id="create-event-button"
-                        disabled
-                        title="Event creation is not available yet"
-                    >Create Event (Coming Soon)</button>
+                        class="button"
+                        id="modal-create-event"
+                    >
+                        Create Event
+                    </button>
                 </div>
             </div>
         </div>
