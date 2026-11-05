@@ -18,9 +18,15 @@
 
         <p>Find games you and your friends can play together.</p>
 
-        <a class="button" href="/auth/steam" id="connect-steam">
-            Connect Steam
-        </a>
+        {% if request.session.get("steam_id") %}
+            <a class="button" href="/library">
+                Go to My Library
+            </a>
+        {% else %}
+            <a class="button" href="/auth/steam" id="connect-steam">
+                Connect Steam
+            </a>
+        {% endif %}
     </main>
 
     <script src="{{ url_for('static', path='script.js') }}"></script>

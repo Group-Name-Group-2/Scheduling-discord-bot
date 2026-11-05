@@ -1,3 +1,4 @@
+{% set nav_user = request.session.get("email") or request.session.get("steam_id") %}
 <nav class="navbar">
     <a class="navbar-brand" href="/">Game Night</a>
 
@@ -8,8 +9,8 @@
         <a href="/shared-games">Shared Games</a>
         <a href="/events">Events</a>
 
-        {% if current_user_email or steam_id %}
-            <span class="navbar-user">{{ current_user_email or steam_id }}</span>
+        {% if nav_user %}
+            <span class="navbar-user">{{ nav_user }}</span>
             <button id="navbar-logout-button" type="button">Sign out</button>
         {% else %}
             <a href="/login">Sign in</a>
@@ -17,7 +18,7 @@
     </div>
 </nav>
 
-{% if current_user_email or steam_id %}
+{% if nav_user %}
 <script>
     document.getElementById("navbar-logout-button").addEventListener("click", async () => {
         await fetch("/auth/logout", { method: "POST" });

@@ -75,9 +75,19 @@ async def steam_callback(request: Request):
         ) from error
 
     if "is_valid:true" not in response.text:
+        print(
+            "[steam_auth] Steam rejected login verification.\n"
+            f"  return_to: {params.get('openid.return_to')}\n"
+            f"  nonce:     {params.get('openid.response_nonce')}\n"
+            f"  response:  {response.text.strip()!r}"
+        )
         raise HTTPException(
             status_code=401,
-            detail="Steam could not verify the login."
+            detail=(
+                "Steam could not verify the login. Each Steam login link "
+                "can only be used once, so start again from /auth/steam "
+                "instead of refreshing this page."
+            ),
         )
 
     # Extract the Steam ID from the verified identity URL.
