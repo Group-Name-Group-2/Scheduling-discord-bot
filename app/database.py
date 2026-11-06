@@ -17,7 +17,8 @@ def init_db():
         connection.executescript("""
             CREATE TABLE IF NOT EXISTS steam_users (
                 steam_id TEXT PRIMARY KEY,
-                last_synced TEXT
+                last_synced TEXT,
+                is_admin INTEGER NOT NULL DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS games (
@@ -93,6 +94,14 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_messages_recipient_unread
                 ON messages (recipient_steam_id, read_at);
 
+            CREATE TABLE IF NOT EXISTS availability (
+                steam_id TEXT NOT NULL,
+                slot_date TEXT NOT NULL,      -- YYYY-MM-DD
+                slot_hour INTEGER NOT NULL,   -- 0-23: free from HH:00 to HH+1:00
+
+                PRIMARY KEY (steam_id, slot_date, slot_hour)
+            );
+
             CREATE TABLE IF NOT EXISTS user_settings (
                 steam_id TEXT PRIMARY KEY,
                 email TEXT,
@@ -104,6 +113,44 @@ def init_db():
             );
 
         """)
+
+        # Databases created before is_admin existed won't get it from
+        # CREATE TABLE IF NOT EXISTS, so add the column if it's missing.
+        columns = {
+            row[1]
+            for row in connection.execute("PRAGMA table_info(steam_users)")
+        }
+
+        if "is_admin" not in columns:
+            connection.execute(
+                "ALTER TABLE steam_users "
+                "ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0"
+            )
+
+
+def is_admin(steam_id: str) -> bool:
+    init_db()
+
+    with get_connection() as connection:
+        row = connection.execute(
+            "SELECT is_admin FROM steam_users WHERE steam_id = ?",
+            (steam_id,),
+        ).fetchone()
+
+    return bool(row and row[0])
+
+
+def set_admin(steam_id: str, admin: bool = True) -> bool:
+    """Grant or remove admin. Returns False if the user doesn't exist yet."""
+    init_db()
+
+    with get_connection() as connection:
+        cursor = connection.execute(
+            "UPDATE steam_users SET is_admin = ? WHERE steam_id = ?",
+            (1 if admin else 0, steam_id),
+        )
+
+    return cursor.rowcount == 1
 
 
 def save_owned_games(steam_id: str, games: list):
@@ -741,3 +788,320 @@ def count_unread_from(sender_steam_id: str, recipient_steam_id: str) -> int:
         ).fetchone()
 
     return row[0]
+
+
+# =========================
+# Availability + data for event recommendations
+# =========================
+
+def get_availability(steam_id: str, start_date: str, end_date: str) -> list[tuple[str, int]]:
+    """(date, hour) slots steam_id is free, for start_date..end_date inclusive."""
+    init_db()
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT slot_date, slot_hour
+            FROM availability
+            WHERE steam_id = ? AND slot_date BETWEEN ? AND ?
+            ORDER BY slot_date, slot_hour
+            """,
+            (steam_id, start_date, end_date),
+        ).fetchall()
+
+    return [(row[0], row[1]) for row in rows]
+
+
+def replace_availability(
+    steam_id: str,
+    dates: list[str],
+    slots: list[tuple[str, int]],
+) -> None:
+    """Replace steam_id's availability on `dates` with `slots`."""
+    init_db()
+
+    with get_connection() as connection:
+        connection.executemany(
+            "DELETE FROM availability WHERE steam_id = ? AND slot_date = ?",
+            [(steam_id, date) for date in dates],
+        )
+        connection.executemany(
+            """
+            INSERT OR IGNORE INTO availability (steam_id, slot_date, slot_hour)
+            VALUES (?, ?, ?)
+            """,
+            [(steam_id, date, hour) for date, hour in slots],
+        )
+
+
+def get_availability_for_users(
+    steam_ids: list[str],
+    start_date: str,
+    end_date: str,
+) -> dict[str, set[tuple[str, int]]]:
+    """steam_id -> set of (date, hour) free slots. Users with none are omitted."""
+    init_db()
+
+    if not steam_ids:
+        return {}
+
+    placeholders = ",".join("?" for _ in steam_ids)
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            f"""
+            SELECT steam_id, slot_date, slot_hour
+            FROM availability
+            WHERE steam_id IN ({placeholders})
+              AND slot_date BETWEEN ? AND ?
+            """,
+            (*steam_ids, start_date, end_date),
+        ).fetchall()
+
+    result: dict[str, set[tuple[str, int]]] = {}
+    for steam_id, slot_date, slot_hour in rows:
+        result.setdefault(steam_id, set()).add((slot_date, slot_hour))
+
+    return result
+
+
+def get_events_for_users(
+    steam_ids: list[str],
+    start_date: str,
+    end_date: str,
+) -> list[dict]:
+    """
+    Events between start_date and end_date that any of steam_ids is in
+    (as creator or participant). Each has `members`: everyone in it.
+    """
+    init_db()
+
+    if not steam_ids:
+        return []
+
+    placeholders = ",".join("?" for _ in steam_ids)
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            f"""
+            SELECT
+                e.event_id, e.event_date, e.event_time, e.duration_minutes,
+                e.creator_steam_id,
+                GROUP_CONCAT(ep.participant_steam_id)
+            FROM game_night_events e
+            LEFT JOIN event_participants ep ON ep.event_id = e.event_id
+            WHERE e.event_date BETWEEN ? AND ?
+            GROUP BY e.event_id
+            """,
+            (start_date, end_date),
+        ).fetchall()
+
+    wanted = set(steam_ids)
+    events = []
+
+    for event_id, date, time, duration, creator, participants in rows:
+        members = {creator, *(participants.split(",") if participants else [])}
+
+        if members & wanted:
+            events.append({
+                "event_id": event_id,
+                "event_date": date,
+                "event_time": time,
+                "duration_minutes": duration,
+                "members": members,
+            })
+
+    return events
+
+
+def get_game_ownership(steam_ids: list[str]) -> dict[int, dict]:
+    """
+    app_id -> {"name": str, "playtime": {steam_id: minutes}} for every game
+    owned by at least one of steam_ids.
+    """
+    init_db()
+
+    if not steam_ids:
+        return {}
+
+    placeholders = ",".join("?" for _ in steam_ids)
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            f"""
+            SELECT ug.app_id, g.name, ug.steam_id, ug.playtime_forever
+            FROM user_games ug
+            JOIN games g ON g.app_id = ug.app_id
+            WHERE ug.steam_id IN ({placeholders})
+            """,
+            tuple(steam_ids),
+        ).fetchall()
+
+    games: dict[int, dict] = {}
+    for app_id, name, steam_id, playtime in rows:
+        game = games.setdefault(app_id, {"name": name, "playtime": {}})
+        game["playtime"][steam_id] = playtime or 0
+
+    return games
+
+
+# =========================
+# Admin
+# =========================
+
+def list_users() -> list[dict]:
+    """Every user who has signed in, with their email and admin status."""
+    init_db()
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                u.steam_id,
+                u.last_synced,
+                u.is_admin,
+                s.email,
+                s.pending_email
+            FROM steam_users u
+            LEFT JOIN user_settings s ON s.steam_id = u.steam_id
+            ORDER BY u.last_synced DESC
+            """
+        ).fetchall()
+
+    return [
+        {
+            "steam_id": row[0],
+            "last_synced": row[1],
+            "is_admin": bool(row[2]),
+            "email": row[3],
+            "pending_email": row[4],
+        }
+        for row in rows
+    ]
+
+
+def user_exists(steam_id: str) -> bool:
+    init_db()
+
+    with get_connection() as connection:
+        row = connection.execute(
+            "SELECT 1 FROM steam_users WHERE steam_id = ?", (steam_id,)
+        ).fetchone()
+
+    return row is not None
+
+
+def admin_set_email(steam_id: str, email: str | None) -> None:
+    """
+    Set (already verified) or remove a user's email, skipping the
+    verification link. Clears any pending verification.
+    """
+    init_db()
+
+    with get_connection() as connection:
+        _ensure_settings_row(connection, steam_id)
+        connection.execute(
+            """
+            UPDATE user_settings
+            SET email = ?,
+                pending_email = NULL,
+                verify_token_hash = NULL,
+                verify_token_expires = NULL
+            WHERE steam_id = ?
+            """,
+            (email, steam_id),
+        )
+
+
+def list_all_events() -> list[dict]:
+    """Every game night, newest date first, with its participants."""
+    init_db()
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                e.event_id, e.creator_steam_id, e.app_id, g.name,
+                e.event_date, e.event_time, e.duration_minutes,
+                GROUP_CONCAT(ep.participant_steam_id)
+            FROM game_night_events e
+            LEFT JOIN games g ON g.app_id = e.app_id
+            LEFT JOIN event_participants ep ON ep.event_id = e.event_id
+            GROUP BY e.event_id
+            ORDER BY e.event_date DESC, e.event_time DESC
+            """
+        ).fetchall()
+
+    return [
+        {
+            "event_id": row[0],
+            "creator_steam_id": row[1],
+            "app_id": row[2],
+            "game_name": row[3] or f"App {row[2]}",
+            "event_date": row[4],
+            "event_time": row[5],
+            "duration_minutes": row[6],
+            "participant_steam_ids": row[7].split(",") if row[7] else [],
+        }
+        for row in rows
+    ]
+
+
+def get_event(event_id: int) -> dict | None:
+    """One event with its participants, regardless of who's asking."""
+    for event in list_all_events():
+        if event["event_id"] == event_id:
+            return event
+    return None
+
+
+def update_event(
+    event_id: int,
+    app_id: int,
+    event_date: str,
+    event_time: str,
+    duration_minutes: int,
+    participant_steam_ids: list[str],
+) -> bool:
+    """Replace an event's details and participants. False if it doesn't exist."""
+    init_db()
+
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            UPDATE game_night_events
+            SET app_id = ?, event_date = ?, event_time = ?, duration_minutes = ?
+            WHERE event_id = ?
+            """,
+            (app_id, event_date, event_time, duration_minutes, event_id),
+        )
+
+        if cursor.rowcount != 1:
+            return False
+
+        connection.execute(
+            "DELETE FROM event_participants WHERE event_id = ?", (event_id,)
+        )
+        connection.executemany(
+            """
+            INSERT INTO event_participants (event_id, participant_steam_id)
+            VALUES (?, ?)
+            """,
+            [(event_id, p) for p in dict.fromkeys(participant_steam_ids)],
+        )
+
+    return True
+
+
+def delete_event(event_id: int) -> bool:
+    init_db()
+
+    with get_connection() as connection:
+        connection.execute(
+            "DELETE FROM event_participants WHERE event_id = ?", (event_id,)
+        )
+        cursor = connection.execute(
+            "DELETE FROM game_night_events WHERE event_id = ?", (event_id,)
+        )
+
+    return cursor.rowcount == 1

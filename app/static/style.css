@@ -1935,3 +1935,521 @@ a.navbar-user:hover {
     font-size: 0.925rem;
     overflow-wrap: anywhere;
 }
+
+
+/* ---------- Availability page ---------- */
+
+.availability-container {
+    max-width: 900px;
+}
+
+.weekend-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding-bottom: 4px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+.weekend-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    flex-shrink: 0;
+    padding: 10px 14px;
+    color: var(--text-muted);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-small);
+    font-weight: 600;
+    text-align: left;
+}
+
+.weekend-tab:hover {
+    color: var(--text);
+    background-color: var(--surface-hover);
+}
+
+.weekend-tab[aria-selected="true"] {
+    color: var(--text);
+    border-color: var(--accent);
+    background-color: var(--accent-soft);
+}
+
+.weekend-tab-label {
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
+.weekend-tab-count {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.weekend-tab.has-slots .weekend-tab-count {
+    color: #7ee2a8;
+}
+
+.availability-panel {
+    padding: 20px;
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+}
+
+.availability-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.availability-hint {
+    font-size: 0.9rem;
+}
+
+.availability-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.availability-grid {
+    display: grid;
+    grid-template-columns: 64px 1fr 1fr;
+    gap: 3px 6px;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none; /* lets you drag across hours on touch screens */
+}
+
+.availability-corner {
+    position: sticky;
+    top: var(--header-height);
+}
+
+.availability-day-heading {
+    padding: 6px 0 10px;
+    font-weight: 700;
+    text-align: center;
+}
+
+.availability-hour-label {
+    align-self: center;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    padding-right: 6px;
+}
+
+.availability-cell {
+    height: 30px;
+    padding: 0;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    transition: background-color 0.08s ease, border-color 0.08s ease;
+}
+
+.availability-cell:hover {
+    background-color: var(--surface-hover);
+    border-color: var(--border-strong);
+}
+
+.availability-cell.selected {
+    background-color: var(--accent-strong);
+    border-color: var(--accent-strong);
+}
+
+.availability-cell.selected:hover {
+    background-color: var(--accent-strong-hover);
+}
+
+.availability-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+.availability-footer p {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+.availability-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto;
+}
+
+.availability-status {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+/* ---------- Suggest-a-time panel on Create Event ---------- */
+
+.suggest-panel {
+    margin: 4px 0 28px;
+    padding: 20px;
+    border: 1px solid rgb(102 192 244 / 30%);
+    border-radius: var(--radius);
+    background: linear-gradient(135deg, rgb(26 159 255 / 12%), rgb(106 92 255 / 9%));
+}
+
+.suggest-panel-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.suggest-panel-header > div {
+    flex: 1 1 280px;
+}
+
+.suggest-panel h2 {
+    margin: 0 0 4px;
+    font-size: 1.05rem;
+}
+
+.suggest-panel-header p {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+#suggest-button.loading {
+    opacity: 0.75;
+    cursor: progress;
+}
+
+.suggest-result {
+    margin-top: 18px;
+}
+
+.suggest-result > p {
+    margin: 0;
+}
+
+.suggest-card {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 16px;
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.suggest-cover {
+    width: 200px;
+    max-width: 100%;
+    aspect-ratio: 460 / 215;
+    object-fit: cover;
+    border-radius: var(--radius-small);
+    align-self: flex-start;
+}
+
+.suggest-card-body {
+    flex: 1 1 260px;
+    min-width: 0;
+}
+
+.suggest-card-body p {
+    margin: 0;
+}
+
+.suggest-eyebrow {
+    color: #7ee2a8;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.suggest-when {
+    margin-top: 4px !important;
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+
+.suggest-game {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.suggest-reasons {
+    margin: 10px 0 0;
+    padding-left: 18px;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+
+.suggest-reasons li + li {
+    margin-top: 2px;
+}
+
+.suggest-extras {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.suggest-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.suggest-chip-label {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-right: 2px;
+}
+
+.suggest-chip {
+    padding: 6px 12px;
+    color: var(--text);
+    background-color: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.suggest-chip:hover {
+    background-color: var(--surface-hover);
+    border-color: var(--accent);
+}
+
+.suggest-error {
+    color: #ffc2c2;
+}
+
+@keyframes just-filled {
+    from {
+        box-shadow: 0 0 0 3px rgb(46 204 113 / 60%);
+        border-color: #2ecc71;
+    }
+    to {
+        box-shadow: 0 0 0 3px rgb(46 204 113 / 0%);
+    }
+}
+
+.just-filled {
+    animation: just-filled 1.6s ease-out;
+}
+
+/* ---------- Admin mode ---------- */
+
+.navbar-admin-badge {
+    padding: 1px 7px;
+    border-radius: 999px;
+    background-color: rgb(245 198 107 / 16%);
+    color: #f5c66b;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.settings-card-admin {
+    border-color: rgb(245 198 107 / 35%);
+}
+
+.settings-card-admin .toggle input:checked + .toggle-track {
+    background-color: #d9a441;
+}
+
+/* ---------- Admin dashboard ---------- */
+
+.admin-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 32px;
+}
+
+.admin-stat {
+    display: flex;
+    flex-direction: column;
+    padding: 16px 18px;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.admin-stat strong {
+    font-size: 1.6rem;
+    line-height: 1.1;
+}
+
+.admin-stat span {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.admin-section {
+    margin-bottom: 40px;
+}
+
+.admin-section h2 {
+    margin: 0 0 12px;
+}
+
+.admin-table-wrap {
+    overflow-x: auto;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.admin-table {
+    width: 100%;
+    min-width: 680px;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.admin-table th {
+    padding: 12px 14px;
+    color: var(--text-muted);
+    background-color: var(--bg-elevated);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-align: left;
+    text-transform: uppercase;
+}
+
+.admin-table td {
+    padding: 12px 14px;
+    border-top: 1px solid var(--border);
+    vertical-align: middle;
+}
+
+.admin-table tbody tr:hover {
+    background-color: var(--surface-hover);
+}
+
+.admin-row-past td {
+    opacity: 0.6;
+}
+
+.admin-person {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.admin-person img {
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.admin-person .navbar-admin-badge {
+    margin-left: 6px;
+}
+
+.admin-person-large {
+    gap: 16px;
+    margin: 12px 0 20px;
+}
+
+.admin-person-large img {
+    border-radius: 12px;
+}
+
+.admin-person-large h1 {
+    margin: 0;
+}
+
+.admin-person-large p {
+    margin: 0;
+}
+
+.admin-sub {
+    color: var(--text-muted);
+    font-size: 0.775rem;
+}
+
+.admin-nowrap {
+    white-space: nowrap;
+}
+
+.admin-actions {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.admin-actions > * {
+    display: inline-flex;
+    margin-left: 6px;
+}
+
+.admin-actions form {
+    margin: 0;
+}
+
+.admin-back {
+    display: inline-block;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+
+.button-danger,
+button.button-danger {
+    background-color: transparent;
+    border-color: rgb(255 99 99 / 45%);
+    color: #ff9b9b;
+}
+
+.button-danger:hover,
+button.button-danger:hover {
+    background-color: rgb(255 99 99 / 14%);
+    border-color: #ff6b6b;
+    color: #ffc2c2;
+}
+
+.admin-danger-zone {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 20px;
+    padding: 18px 20px;
+    border: 1px solid rgb(255 99 99 / 30%);
+    border-radius: var(--radius);
+}
+
+.admin-danger-zone p {
+    margin: 2px 0 0;
+    font-size: 0.875rem;
+}
+
+.notice-admin {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    color: #f8dfa8;
+    background-color: rgb(245 198 107 / 10%);
+    border: 1px solid rgb(245 198 107 / 35%);
+}

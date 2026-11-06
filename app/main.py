@@ -15,6 +15,8 @@ from steam_auth import router as steam_auth_router
 from auth_email_routes import router as email_auth_router
 from messages_routes import router as messages_router
 from settings_routes import router as settings_router
+from availability_routes import router as availability_router
+from admin_routes import router as admin_router
 from steam_api import get_game_details, get_player_summaries
 
 
@@ -39,6 +41,8 @@ app.include_router(steam_auth_router)
 app.include_router(email_auth_router)
 app.include_router(messages_router)
 app.include_router(settings_router)
+app.include_router(availability_router)
+app.include_router(admin_router)
 
 app.mount(
     "/static",

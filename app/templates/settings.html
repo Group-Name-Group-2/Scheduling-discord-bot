@@ -109,6 +109,41 @@
                 <p class="muted-text settings-help">Add and verify an email address above to turn this on.</p>
             {% endif %}
         </section>
+
+        {% if can_be_admin %}
+            <section class="settings-card settings-card-admin" aria-labelledby="admin-heading">
+                <div class="settings-card-header">
+                    <h2 id="admin-heading">Admin mode</h2>
+                    {% if self_admin_testing %}
+                        <p class="muted-text">
+                            <span class="badge badge-pending">Testing</span>
+                            Switch your account between admin and regular user.
+                            Available to everyone on this test branch.
+                        </p>
+                    {% else %}
+                        <p class="muted-text">
+                            Your account has admin access. Turn admin mode off to use the site
+                            exactly like a regular user, and back on when you need it.
+                        </p>
+                    {% endif %}
+                </div>
+
+                <form method="post" action="/settings/admin-mode" class="settings-row">
+                    <label class="toggle">
+                        <input
+                            type="checkbox"
+                            name="admin_mode"
+                            {% if admin_mode %}checked{% endif %}
+                            onchange="this.form.submit()"
+                        >
+                        <span class="toggle-track" aria-hidden="true"></span>
+                        <span>{% if admin_mode %}Admin mode is on{% else %}Admin mode is off{% endif %}</span>
+                    </label>
+
+                    <noscript><button type="submit" class="button-small">Save</button></noscript>
+                </form>
+            </section>
+        {% endif %}
     </main>
 
     {% include "footer.html" %}

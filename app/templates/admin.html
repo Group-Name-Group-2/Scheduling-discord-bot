@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin | Game Night</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    {% include "navbar.html" %}
+
+    <main class="container">
+        <h1>Admin</h1>
+        <p class="page-subtitle">Manage every user's email and schedule, and every game night on the site.</p>
+
+        {% if status_message %}
+            <div class="notice {% if status_is_error %}notice-error{% else %}notice-success{% endif %}" role="status">
+                {{ status_message }}
+            </div>
+        {% endif %}
+
+        <div class="admin-stats">
+            <div class="admin-stat"><strong>{{ users | length }}</strong><span>Users</span></div>
+            <div class="admin-stat"><strong>{{ events | length }}</strong><span>Events</span></div>
+            <div class="admin-stat">
+                <strong>{{ events | selectattr("event_date", "ge", today) | list | length }}</strong>
+                <span>Upcoming</span>
+            </div>
+        </div>
+
+        <section class="admin-section" aria-labelledby="users-heading">
+            <h2 id="users-heading">Users</h2>
+
+            {% if users %}
+                <div class="admin-table-wrap">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">User</th>
+                                <th scope="col">Email</th>
+                                <th scope="col">Last sign-in</th>
+                                <th scope="col"><span class="visually-hidden">Actions</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users %}
+                                {% set person = people[user.steam_id] %}
+                                <tr>
+                                    <td>
+                                        <div class="admin-person">
+                                            {% if person.avatar %}
+                                                <img src="{{ person.avatar }}" alt="" width="32" height="32" loading="lazy">
+                                            {% endif %}
+                                            <div>
+                                                <strong>{{ person.name }}</strong>
+                                                {% if user.is_admin %}<span class="navbar-admin-badge">Admin</span>{% endif %}
+                                                <div class="admin-sub">{{ user.steam_id }}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if user.email %}
+                                            {{ user.email }}
+                                        {% elif user.pending_email %}
+                                            <span class="muted-text">{{ user.pending_email }}</span>
+                                            <span class="badge badge-pending">Unverified</span>
+                                        {% else %}
+                                            <span class="muted-text">None</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="admin-nowrap muted-text">
+                                        {{ user.last_synced[:10] if user.last_synced else "Never" }}
+                                    </td>
+                                    <td class="admin-actions">
+                                        <a class="button button-ghost button-small" href="/admin/users/{{ user.steam_id }}">Edit email</a>
+                                        <a class="button button-ghost button-small" href="/availability?user={{ user.steam_id }}">Edit schedule</a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state"><p>No users have signed in yet.</p></div>
+            {% endif %}
+        </section>
+
+        <section class="admin-section" aria-labelledby="events-heading">
+            <h2 id="events-heading">Events</h2>
+
+            {% if events %}
+                <div class="admin-table-wrap">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">When</th>
+                                <th scope="col">Game</th>
+                                <th scope="col">Organiser</th>
+                                <th scope="col">Participants</th>
+                                <th scope="col"><span class="visually-hidden">Actions</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for event in events %}
+                                <tr{% if event.event_date < today %} class="admin-row-past"{% endif %}>
+                                    <td class="admin-nowrap">
+                                        <strong>{{ event.event_date }}</strong>
+                                        <div class="admin-sub">{{ event.event_time }} · {{ event.duration_minutes }} min</div>
+                                    </td>
+                                    <td>{{ event.game_name }}</td>
+                                    <td>{{ people[event.creator_steam_id].name }}</td>
+                                    <td>
+                                        {% if event.participant_steam_ids %}
+                                            {% for pid in event.participant_steam_ids %}{{ people[pid].name }}{{ ", " if not loop.last }}{% endfor %}
+                                        {% else %}
+                                            <span class="muted-text">None</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="admin-actions">
+                                        <a class="button button-ghost button-small" href="/admin/events/{{ event.event_id }}">Edit</a>
+                                        <form method="post" action="/admin/events/{{ event.event_id }}/delete"
+                                              onsubmit="return confirm('Delete this event for everyone? This can\'t be undone.');">
+                                            <button type="submit" class="button button-danger button-small">Delete</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state"><p>No events have been created yet.</p></div>
+            {% endif %}
+        </section>
+    </main>
+
+    {% include "footer.html" %}
+</body>
+</html>

@@ -18,11 +18,14 @@ from fastapi.templating import Jinja2Templates
 from database import (
     confirm_pending_email,
     get_user_settings,
+    is_admin,
     remove_user_email,
+    set_admin,
     set_notify_messages,
     set_pending_email,
 )
 from email_service import app_base_url, is_valid_email, send_email
+from permissions import admin_mode_active
 
 router = APIRouter()
 
@@ -31,6 +34,12 @@ templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
 VERIFY_LINK_HOURS = 24
 RESEND_COOLDOWN_SECONDS = 60
+
+# TESTING ONLY: lets ANY signed-in user make themselves an admin (and back)
+# from the Settings page, by changing steam_users.is_admin directly.
+# Set to False before merging this branch. When False, only users already
+# flagged as admins in the database can switch admin mode on/off.
+ALLOW_SELF_ADMIN_FOR_TESTING = True
 
 # Short codes in the URL after a form submit -> (message, is_error).
 STATUS_MESSAGES = {
@@ -43,6 +52,8 @@ STATUS_MESSAGES = {
     "wait": ("Please wait a minute before requesting another link.", True),
     "send_failed": ("We couldn't send the verification email. Please try again later.", True),
     "bad_token": ("That verification link is invalid or has expired. Request a new one below.", True),
+    "admin_on": ("Admin mode is on.", False),
+    "admin_off": ("Admin mode is off. You're now using the site as a regular user.", False),
 }
 
 
@@ -75,8 +86,38 @@ def settings_page(request: Request, status: str = ""):
             "settings": settings,
             "status_message": message,
             "status_is_error": is_error,
+            "can_be_admin": ALLOW_SELF_ADMIN_FOR_TESTING or is_admin(steam_id),
+            "self_admin_testing": ALLOW_SELF_ADMIN_FOR_TESTING,
+            "admin_mode": admin_mode_active(request),
         },
     )
+
+
+@router.post("/settings/admin-mode")
+async def update_admin_mode(request: Request):
+    steam_id = request.session.get("steam_id")
+
+    if not steam_id:
+        return RedirectResponse(url="/", status_code=303)
+
+    form = await request.form()
+    turn_on = form.get("admin_mode") == "on"
+
+    if ALLOW_SELF_ADMIN_FOR_TESTING:
+        # Testing: the switch changes the database flag itself.
+        set_admin(steam_id, turn_on)
+
+    # Only users flagged as admins in the database may switch it on.
+    # Anyone may switch it off.
+    if turn_on and not is_admin(steam_id):
+        return RedirectResponse(url="/settings", status_code=303)
+
+    if turn_on:
+        request.session["admin_mode"] = True
+    else:
+        request.session.pop("admin_mode", None)
+
+    return _redirect("admin_on" if turn_on else "admin_off")
 
 
 @router.post("/settings/email")
