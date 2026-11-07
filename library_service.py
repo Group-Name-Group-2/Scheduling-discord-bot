@@ -1,4 +1,7 @@
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
+
+import requests
 
 from content_filter import start_check as start_content_check
 from steam_api import get_owned_games
@@ -74,3 +77,32 @@ def sync_friend_library(friend_steam_id: str) -> dict:
         "available": True,
         "message": None,
     }
+
+
+# How many friends' libraries to download from Steam at the same time.
+MAX_PARALLEL_SYNCS = 8
+
+
+def sync_friend_libraries(friend_steam_ids) -> dict[str, dict | None]:
+    """
+    sync_friend_library for several friends at once, in parallel, so N
+    friends take about as long as one Steam call instead of N in a row.
+    Waits for every sync to finish before returning, so callers always
+    see the fresh data.
+
+    Returns friend_steam_id -> sync result, or None if Steam couldn't be
+    reached for that friend (the saved library, if any, is untouched).
+    """
+    ids = list(dict.fromkeys(friend_steam_ids))
+
+    if not ids:
+        return {}
+
+    def safe_sync(friend_id: str) -> dict | None:
+        try:
+            return sync_friend_library(friend_id)
+        except (requests.RequestException, RuntimeError):
+            return None
+
+    with ThreadPoolExecutor(max_workers=min(MAX_PARALLEL_SYNCS, len(ids))) as pool:
+        return dict(zip(ids, pool.map(safe_sync, ids)))

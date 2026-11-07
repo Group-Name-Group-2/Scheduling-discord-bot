@@ -12,11 +12,12 @@ from pathlib import Path
 
 import requests
 from fastapi import APIRouter, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from database import get_availability, get_saved_friends, replace_availability, user_exists
-from library_service import sync_friend_library
+from library_service import sync_friend_libraries
 from permissions import admin_mode_active
 from recommender import EARLIEST_HOUR, LATEST_END_HOUR, recommend_event
 from steam_api import get_player_summaries
@@ -212,14 +213,14 @@ async def recommend_for_event(request: Request):
 
     # Make sure friends' libraries are in the database so the game
     # recommendation can use them. Failures just mean older data is used.
-    for friend_id in friend_ids:
-        try:
-            sync_friend_library(friend_id)
-        except (requests.RequestException, RuntimeError):
-            pass
+    # Synced in parallel, in a worker thread so other requests aren't
+    # blocked; this still waits for every sync before recommending.
+    await run_in_threadpool(sync_friend_libraries, friend_ids)
 
     group = [steam_id, *sorted(friend_ids)]
-    result = recommend_event(group, duration_minutes=duration, required_game_owner=steam_id)
+    result = await run_in_threadpool(
+        recommend_event, group, duration_minutes=duration, required_game_owner=steam_id
+    )
 
     if not result["ok"]:
         messages = {
@@ -238,7 +239,7 @@ async def recommend_for_event(request: Request):
         )
 
     try:
-        profiles = get_player_summaries(group)
+        profiles = await run_in_threadpool(get_player_summaries, group)
     except (requests.RequestException, RuntimeError):
         profiles = {}
 

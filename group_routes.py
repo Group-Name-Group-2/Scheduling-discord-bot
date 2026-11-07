@@ -24,6 +24,7 @@ from pathlib import Path
 
 import requests
 from fastapi import APIRouter, BackgroundTasks, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -317,7 +318,8 @@ async def send_group_message(
         )
 
     message = save_group_message(group_id, steam_id, body)
-    people = people_info(group["member_ids"])
+    # people_info may call Steam, so keep it off the event loop.
+    people = await run_in_threadpool(people_info, group["member_ids"])
     decorate_messages([message], steam_id, people)
 
     # Each member gets a title from their own point of view

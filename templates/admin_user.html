@@ -22,8 +22,12 @@
                 <img src="{{ person.avatar }}" alt="" width="56" height="56">
             {% endif %}
             <div>
-                <h1>{{ person.name }}</h1>
-                <p class="muted-text">Steam ID {{ user_id }}</p>
+                <h1>
+                    {{ person.name }}
+                    {% if override.display_name %}<span class="badge badge-pending">Custom name</span>{% endif %}
+                </h1>
+                <p class="muted-text">Steam name: {{ steam_name or "Couldn't load from Steam" }}</p>
+                <p class="muted-text">Steam ID: {{ user_id }}</p>
             </div>
         </div>
 

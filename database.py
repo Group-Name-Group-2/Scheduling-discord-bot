@@ -1,9 +1,15 @@
 import sqlite3
+import threading
 from pathlib import Path
 from datetime import datetime, timezone
 
-# Store the database in the project root, next to app/.
-DATABASE_PATH = Path(__file__).resolve().parent.parent / "gamenight.db"
+# Store the database in the project root.
+DATABASE_PATH = Path(__file__).resolve().parent / "gamenight.db"
+
+# The schema only needs creating/migrating once per process; after that,
+# init_db() is a cheap flag check.
+_db_initialized = False
+_db_init_lock = threading.Lock()
 
 
 def get_connection():
@@ -13,7 +19,22 @@ def get_connection():
 
 
 def init_db():
+    global _db_initialized
+
+    if _db_initialized:
+        return
+
+    with _db_init_lock:
+        if not _db_initialized:
+            _create_schema()
+            _db_initialized = True
+
+
+def _create_schema():
     with get_connection() as connection:
+        # Default rollback journal, not WAL: measured on Windows, WAL made
+        # every write ~1.8x slower, and this app rarely has concurrent
+        # writers. Switch to WAL if "database is locked" errors show up.
         connection.executescript("""
             CREATE TABLE IF NOT EXISTS steam_users (
                 steam_id TEXT PRIMARY KEY,
@@ -292,34 +313,37 @@ def save_owned_games(steam_id: str, games: list, mark_synced: bool = True):
             (synced_at, steam_id),
         )
 
-        for game in games:
-            app_id = game.get("appid")
-            name = game.get("name") or "Unknown Game"
-            playtime = game.get("playtime_forever", 0)
+        kept = [
+            game for game in games
+            if game.get("appid") is not None and game.get("appid") not in ignored
+        ]
 
-            if app_id is None or app_id in ignored:
-                continue
+        # Save the games themselves.
+        connection.executemany("""
+            INSERT INTO games (app_id, name)
+            VALUES (?, ?)
+            ON CONFLICT(app_id)
+            DO UPDATE SET name = excluded.name
+        """, [
+            (game["appid"], game.get("name") or "Unknown Game")
+            for game in kept
+        ])
 
-            # Save the game itself.
-            connection.execute("""
-                INSERT INTO games (app_id, name)
-                VALUES (?, ?)
-                ON CONFLICT(app_id)
-                DO UPDATE SET name = excluded.name
-            """, (app_id, name))
-
-            # Save the user's ownership and playtime.
-            connection.execute("""
-                INSERT INTO user_games (
-                    steam_id,
-                    app_id,
-                    playtime_forever
-                )
-                VALUES (?, ?, ?)
-                ON CONFLICT(steam_id, app_id)
-                DO UPDATE SET
-                    playtime_forever = excluded.playtime_forever
-            """, (steam_id, app_id, playtime))
+        # Save the user's ownership and playtime.
+        connection.executemany("""
+            INSERT INTO user_games (
+                steam_id,
+                app_id,
+                playtime_forever
+            )
+            VALUES (?, ?, ?)
+            ON CONFLICT(steam_id, app_id)
+            DO UPDATE SET
+                playtime_forever = excluded.playtime_forever
+        """, [
+            (steam_id, game["appid"], game.get("playtime_forever", 0))
+            for game in kept
+        ])
 
 
 def get_saved_games(steam_id: str):
@@ -394,26 +418,24 @@ def save_friends(steam_id: str, friends: list):
             (steam_id,),
         )
 
-        for friend in friends:
-            friend_id = friend.get("steamid")
-
-            if not friend_id:
-                continue
-
-            connection.execute("""
-                INSERT INTO steam_friends (
-                    steam_id,
-                    friend_steam_id,
-                    relationship,
-                    friend_since
-                )
-                VALUES (?, ?, ?, ?)
-            """, (
+        connection.executemany("""
+            INSERT INTO steam_friends (
                 steam_id,
-                friend_id,
+                friend_steam_id,
+                relationship,
+                friend_since
+            )
+            VALUES (?, ?, ?, ?)
+        """, [
+            (
+                steam_id,
+                friend["steamid"],
                 friend.get("relationship", "friend"),
                 friend.get("friend_since"),
-            ))
+            )
+            for friend in friends
+            if friend.get("steamid")
+        ])
 
 
 def get_saved_friends(steam_id: str):
@@ -471,17 +493,16 @@ def save_game_night_event(
 
         event_id = cursor.lastrowid
 
-        for participant_id in set(participant_steam_ids):
-            connection.execute(
-                """
-                INSERT INTO event_participants (
-                    event_id,
-                    participant_steam_id
-                )
-                VALUES (?, ?)
-                """,
-                (event_id, participant_id),
+        connection.executemany(
+            """
+            INSERT INTO event_participants (
+                event_id,
+                participant_steam_id
             )
+            VALUES (?, ?)
+            """,
+            [(event_id, p) for p in set(participant_steam_ids)],
+        )
 
     return event_id
 
@@ -1844,13 +1865,13 @@ def list_unknown_rated_games() -> list[dict]:
     return [{"appid": row[0], "name": row[1]} for row in rows]
 
 
-def list_all_events() -> list[dict]:
-    """Every game night, newest date first, with its participants."""
+def _query_events(where: str = "", params: tuple = ()) -> list[dict]:
+    """Events (optionally filtered by `where`), newest date first."""
     init_db()
 
     with get_connection() as connection:
         rows = connection.execute(
-            """
+            f"""
             SELECT
                 e.event_id, e.creator_steam_id, e.app_id, g.name,
                 e.event_date, e.event_time, e.duration_minutes,
@@ -1858,9 +1879,11 @@ def list_all_events() -> list[dict]:
             FROM game_night_events e
             LEFT JOIN games g ON g.app_id = e.app_id
             LEFT JOIN event_participants ep ON ep.event_id = e.event_id
+            {where}
             GROUP BY e.event_id
             ORDER BY e.event_date DESC, e.event_time DESC
-            """
+            """,
+            params,
         ).fetchall()
 
     return [
@@ -1878,12 +1901,15 @@ def list_all_events() -> list[dict]:
     ]
 
 
+def list_all_events() -> list[dict]:
+    """Every game night, newest date first, with its participants."""
+    return _query_events()
+
+
 def get_event(event_id: int) -> dict | None:
     """One event with its participants, regardless of who's asking."""
-    for event in list_all_events():
-        if event["event_id"] == event_id:
-            return event
-    return None
+    events = _query_events("WHERE e.event_id = ?", (event_id,))
+    return events[0] if events else None
 
 
 def update_event(

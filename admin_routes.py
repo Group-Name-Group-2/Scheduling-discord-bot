@@ -36,6 +36,7 @@ from pathlib import Path
 
 import requests
 from fastapi import APIRouter, BackgroundTasks, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -230,6 +231,14 @@ def user_page(request: Request, steam_id: str, status: str = ""):
     override = get_profile_overrides([steam_id]).get(steam_id, {})
     message, is_error = _status(status)
 
+    # The name on their Steam account, ignoring any override set here.
+    try:
+        steam_name = get_player_summaries([steam_id], apply_overrides=False).get(
+            steam_id, {}
+        ).get("personaname")
+    except (requests.RequestException, RuntimeError):
+        steam_name = None
+
     return templates.TemplateResponse(
         request=request,
         name="admin_user.html",
@@ -237,6 +246,7 @@ def user_page(request: Request, steam_id: str, status: str = ""):
             "user_id": steam_id,
             "person": person,
             "override": override,
+            "steam_name": steam_name,
             "max_name_length": MAX_DISPLAY_NAME_LENGTH,
             "settings": get_user_settings(steam_id),
             "status_message": message,
@@ -300,7 +310,7 @@ async def set_user_name(request: Request, steam_id: str):
 
     if form.get("action") == "reset":
         admin_set_display_name(steam_id, None)
-        _refresh_own_session(request, steam_id)
+        await run_in_threadpool(_refresh_own_session, request, steam_id)
         return RedirectResponse(url=back + "name_reset", status_code=303)
 
     # Collapse whitespace so names stay on one line everywhere
@@ -311,7 +321,7 @@ async def set_user_name(request: Request, steam_id: str):
         return RedirectResponse(url=back + "name_invalid", status_code=303)
 
     admin_set_display_name(steam_id, name)
-    _refresh_own_session(request, steam_id)
+    await run_in_threadpool(_refresh_own_session, request, steam_id)
     return RedirectResponse(url=back + "name_saved", status_code=303)
 
 
@@ -349,7 +359,7 @@ async def set_user_avatar(request: Request, steam_id: str):
     if form.get("action") == "reset":
         _delete_uploaded_avatar(steam_id)
         admin_set_avatar(steam_id, None)
-        _refresh_own_session(request, steam_id)
+        await run_in_threadpool(_refresh_own_session, request, steam_id)
         return RedirectResponse(url=back + "avatar_reset", status_code=303)
 
     upload = form.get("avatar")
@@ -375,7 +385,7 @@ async def set_user_avatar(request: Request, steam_id: str):
 
     _delete_uploaded_avatar(steam_id)
     admin_set_avatar(steam_id, f"/static/avatars/{filename}")
-    _refresh_own_session(request, steam_id)
+    await run_in_threadpool(_refresh_own_session, request, steam_id)
     return RedirectResponse(url=back + "avatar_saved", status_code=303)
 
 
@@ -759,12 +769,14 @@ async def send_as_user_in_group(
     group = get_group(group_id)
     save_group_message(group_id, steam_id, body, sent_by_steam_id=request.session["steam_id"])
 
+    sender_name = (await run_in_threadpool(_names, [steam_id]))[steam_id]["name"]
+
     background_tasks.add_task(
         notify_group_message,
         group_id=group_id,
         group_title=group["name"] or "a group chat",
         sender_steam_id=steam_id,
-        sender_name=_names([steam_id])[steam_id]["name"],
+        sender_name=sender_name,
         member_ids=group["member_ids"],
         body=body,
         base_url=app_base_url(str(request.base_url)),
@@ -832,11 +844,13 @@ async def send_as_user(
         sent_by_steam_id=request.session["steam_id"],
     )
 
+    sender_name = (await run_in_threadpool(_names, [steam_id]))[steam_id]["name"]
+
     # The recipient is notified exactly as if the user had sent it.
     background_tasks.add_task(
         notify_new_message,
         sender_steam_id=steam_id,
-        sender_name=_names([steam_id])[steam_id]["name"],
+        sender_name=sender_name,
         recipient_steam_id=other_id,
         body=body,
         base_url=app_base_url(str(request.base_url)),

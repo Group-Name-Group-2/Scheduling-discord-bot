@@ -8,6 +8,7 @@ from pathlib import Path
 
 import requests
 from fastapi import APIRouter, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -41,7 +42,8 @@ async def request_email_login(request: Request):
     email = str(form.get("email", "")).strip()
 
     base_url = str(request.base_url).rstrip("/")
-    ok, message = request_magic_link(email, base_url)
+    # Sends an email (SMTP), so run it in a thread to keep the server responsive.
+    ok, message = await run_in_threadpool(request_magic_link, email, base_url)
 
     if not ok:
         return JSONResponse({"error": message}, status_code=400)

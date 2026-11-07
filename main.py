@@ -10,7 +10,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 
-from database import get_saved_games, get_saved_friends, save_game_night_event, get_calendar_events, get_event_details_for_user
+from database import init_db, get_saved_games, get_saved_friends, save_game_night_event, get_calendar_events, get_event_details_for_user
 from steam_auth import router as steam_auth_router
 from auth_email_routes import router as email_auth_router
 from group_routes import router as group_router
@@ -28,6 +28,10 @@ SESSION_SECRET = os.getenv("SESSION_SECRET")
 
 if not SESSION_SECRET:
     raise RuntimeError("SESSION_SECRET is missing from .env")
+
+# Create/migrate the database once at startup. Later init_db() calls
+# inside database.py are just a cheap flag check.
+init_db()
 
 app = FastAPI(title="Game Night")
 

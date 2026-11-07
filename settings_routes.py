@@ -12,6 +12,7 @@ from html import escape
 from pathlib import Path
 
 from fastapi import APIRouter, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -153,7 +154,9 @@ async def request_email_link(request: Request):
     link = f"{app_base_url(str(request.base_url))}/settings/email/verify?token={token}"
     name = request.session.get("steam_name") or "your Steam account"
 
-    sent = send_email(
+    # SMTP can take seconds; run it in a thread so other requests aren't blocked.
+    sent = await run_in_threadpool(
+        send_email,
         to=email,
         subject="Confirm your email for Game Night",
         text=(

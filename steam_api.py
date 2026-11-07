@@ -1,4 +1,6 @@
 import os
+import threading
+import time
 
 import requests
 from dotenv import load_dotenv
@@ -6,6 +8,17 @@ from dotenv import load_dotenv
 load_dotenv()
 
 API_KEY = os.getenv("STEAM_API_KEY")
+
+# One shared session keeps connections to Steam open between calls,
+# skipping a fresh TCP + TLS handshake on every request.
+_http = requests.Session()
+
+# Steam profiles (name, avatar) barely change, so remember them for a
+# while instead of asking Steam on every page load. Admin overrides are
+# applied after the cache, so admin edits still show up immediately.
+PROFILE_CACHE_SECONDS = 10 * 60
+_profile_cache: dict[str, tuple[float, dict]] = {}
+_profile_cache_lock = threading.Lock()
 
 API_URL = (
     "https://api.steampowered.com/"
@@ -25,7 +38,7 @@ def get_owned_games(steam_id: str):
         "format": "json",
     }
 
-    response = requests.get(API_URL, params=params, timeout=15)
+    response = _http.get(API_URL, params=params, timeout=15)
     response.raise_for_status()
 
     data = response.json()
@@ -53,7 +66,7 @@ def get_friends_list(steam_id: str):
         "relationship": "friend",
     }
 
-    response = requests.get(
+    response = _http.get(
         friends_url,
         params=params,
         timeout=15,
@@ -69,38 +82,63 @@ def get_friends_list(steam_id: str):
     return friends_list.get("friends", [])
 
 
-def get_player_summaries(steam_ids: list[str]) -> dict:
-    """Retrieve Steam profile details for a list of Steam IDs."""
+def get_player_summaries(steam_ids: list[str], apply_overrides: bool = True) -> dict:
+    """
+    Retrieve Steam profile details for a list of Steam IDs.
+    apply_overrides=False returns exactly what Steam has, ignoring any
+    admin-set display name or picture (used to show the original name).
+    """
     if not steam_ids:
         return {}
 
     profiles = {}
+    missing = []
+    now = time.monotonic()
+
+    with _profile_cache_lock:
+        for steam_id in dict.fromkeys(steam_ids):
+            cached = _profile_cache.get(steam_id)
+
+            if cached and now - cached[0] < PROFILE_CACHE_SECONDS:
+                # Copy so overrides applied below never leak into the cache.
+                profiles[steam_id] = dict(cached[1])
+            else:
+                missing.append(steam_id)
+
     url = "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/"
 
     # Steam accepts up to 100 Steam IDs per request
-    for start in range(0, len(steam_ids), 100):
-        batch = steam_ids[start:start + 100]
+    for start in range(0, len(missing), 100):
+        batch = missing[start:start + 100]
 
         params = {
             "key": API_KEY,
             "steamids": ",".join(batch)
         }
 
-        response = requests.get(url, params=params, timeout=15)
+        response = _http.get(url, params=params, timeout=15)
         response.raise_for_status()
 
         data = response.json()
         players = data.get("response", {}).get("players", [])
+        fetched_at = time.monotonic()
 
         # Index profiles by Steam ID
         for player in players:
-            profiles[player["steamid"]] = {
+            profile = {
                 "steamid": player["steamid"],
                 "personaname": player.get("personaname", "Unknown Player"),
                 "avatarfull": player.get("avatarfull", ""),
                 "avatarmedium": player.get("avatarmedium", ""),
                 "profileurl": player.get("profileurl", "")
             }
+            profiles[player["steamid"]] = profile
+
+            with _profile_cache_lock:
+                _profile_cache[player["steamid"]] = (fetched_at, dict(profile))
+
+    if not apply_overrides:
+        return profiles
 
     return apply_profile_overrides(profiles, steam_ids)
 
@@ -146,7 +184,7 @@ def get_game_details(app_id: int) -> dict | None:
         "l": "en",
     }
 
-    response = requests.get(url, params=params, timeout=15)
+    response = _http.get(url, params=params, timeout=15)
     response.raise_for_status()
 
     result = response.json().get(str(app_id), {})
@@ -185,7 +223,7 @@ def get_content_rating(app_id: int) -> dict | None:
     None if Steam has no store data for it (removed, region-locked or
     some adult-only titles). Raises SteamRateLimited on 429.
     """
-    response = requests.get(
+    response = _http.get(
         "https://store.steampowered.com/api/appdetails",
         params={"appids": app_id, "l": "en"},
         timeout=15,

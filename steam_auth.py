@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 
 from database import save_owned_games, get_saved_games, save_friends, get_saved_friends, get_shared_games, mark_signed_in
 from steam_api import get_owned_games, get_friends_list, get_player_summaries
-from library_service import library_is_recent, sync_friend_library
+from library_service import library_is_recent, sync_friend_library, sync_friend_libraries
 from content_filter import start_check as start_content_check
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -37,7 +37,7 @@ async def login_with_steam():
     return RedirectResponse(url=login_url)
 
 @router.get("/auth/steam/callback")
-async def steam_callback(request: Request):
+def steam_callback(request: Request):
     params = dict(request.query_params)
 
     # Make sure Steam returned a successful OpenID response.
@@ -144,7 +144,7 @@ async def logout(request: Request):
 
 
 @router.get("/library")
-async def library(request: Request):
+def library(request: Request):
     steam_id = request.session.get("steam_id")
 
     if not steam_id:
@@ -163,7 +163,7 @@ async def library(request: Request):
 
 
 @router.get("/friends")
-async def friends_page(request: Request):
+def friends_page(request: Request):
     steam_id = request.session.get("steam_id")
 
     if not steam_id:
@@ -220,7 +220,7 @@ async def friends_page(request: Request):
     )
 
 @router.get("/friends/{friend_steam_id}/library")
-async def friend_library_page(
+def friend_library_page(
     request: Request,
     friend_steam_id: str
 ):
@@ -266,7 +266,7 @@ async def friend_library_page(
 
 
 @router.get("/shared-games")
-async def shared_games_page(request: Request):
+def shared_games_page(request: Request):
     steam_id = request.session.get("steam_id")
 
     if not steam_id:
@@ -333,11 +333,16 @@ async def shared_games_page(request: Request):
 
         # Refresh each selected friend's library from Steam so the
         # comparison doesn't rely on libraries saved earlier (or never).
+        # All friends sync in parallel; this waits until every one is done.
+        sync_results = sync_friend_libraries(selected_friend_ids)
+
         for friend_id in selected_friend_ids:
-            try:
-                available = sync_friend_library(friend_id)["available"]
-            except (requests.RequestException, RuntimeError):
+            result = sync_results.get(friend_id)
+
+            if result is None:  # Steam unreachable: fall back to the saved copy
                 available = bool(get_saved_games(friend_id))
+            else:
+                available = result["available"]
 
             if available:
                 compared_friend_ids.append(friend_id)
@@ -365,7 +370,7 @@ async def shared_games_page(request: Request):
     )
 
 @router.get("/friends/{friend_steam_id}/shared-games")
-async def friend_shared_games_page(request: Request, friend_steam_id: str):
+def friend_shared_games_page(request: Request, friend_steam_id: str):
     steam_id = request.session.get("steam_id")
 
     if not steam_id:
