@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New group chat | Messages | Game Night</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    {% include "navbar.html" %}
+
+    <main class="container settings-container">
+        <a class="admin-back" href="/messages">&larr; Back to Messages</a>
+
+        <h1>New group chat</h1>
+        <p class="page-subtitle">Pick two or more friends to chat with together.</p>
+
+        {% if error %}
+            <div class="notice notice-error" role="alert">{{ error }}</div>
+        {% endif %}
+
+        {% if friends %}
+            <form method="post" action="/messages/groups/new" class="settings-card group-form">
+                <div class="form-group">
+                    <label for="group-name">Group name <span class="muted-text">(optional)</span></label>
+                    <input
+                        id="group-name"
+                        type="text"
+                        name="name"
+                        maxlength="{{ max_name_length }}"
+                        placeholder="e.g. Friday raid squad"
+                    >
+                    <p class="muted-text settings-help">Leave it blank to show everyone's names instead.</p>
+                </div>
+
+                <div class="form-group">
+                    <label id="members-label">Who's in it?</label>
+                    <div class="event-participants" role="group" aria-labelledby="members-label">
+                        {% for friend in friends %}
+                            <label class="event-participant">
+                                <input
+                                    type="checkbox"
+                                    name="member_ids"
+                                    value="{{ friend.steamid }}"
+                                    {% if friend.steamid in selected %}checked{% endif %}
+                                >
+                                {% if friend.avatar %}
+                                    <img src="{{ friend.avatar }}" alt="" class="event-participant-avatar" loading="lazy">
+                                {% endif %}
+                                <span>{{ friend.name }}</span>
+                            </label>
+                        {% endfor %}
+                    </div>
+                    <p class="muted-text settings-help">Up to {{ max_members - 1 }} friends.</p>
+                </div>
+
+                <button type="submit">Create group</button>
+            </form>
+        {% else %}
+            <div class="empty-state">
+                <p>
+                    No saved friends yet. Open the <a href="/friends">Friends</a> page
+                    to load your Steam friends list.
+                </p>
+            </div>
+        {% endif %}
+    </main>
+
+    {% include "footer.html" %}
+</body>
+</html>

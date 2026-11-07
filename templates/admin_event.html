@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit event | Admin | Game Night</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    {% include "navbar.html" %}
+
+    <main class="container event-form-container">
+        <a class="admin-back" href="/admin">&larr; Back to Admin</a>
+
+        <div class="events-heading">
+            <h1>Edit event</h1>
+            <p class="muted-text">
+                Organised by {{ people[event.creator_steam_id].name }}. Changes apply for everyone invited.
+            </p>
+        </div>
+
+        {% if status_message %}
+            <div class="notice {% if status_is_error %}notice-error{% else %}notice-success{% endif %}" role="status">
+                {{ status_message }}
+            </div>
+        {% endif %}
+
+        <form method="post" action="/admin/events/{{ event.event_id }}" class="event-form">
+            <div class="form-group">
+                <label for="event-game">Game</label>
+                <select id="event-game" name="game_id" required>
+                    {% for game in games %}
+                        <option value="{{ game.appid }}" {% if game.appid == event.app_id %}selected{% endif %}>
+                            {{ game.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="event-date">Date</label>
+                    <input type="date" id="event-date" name="date" value="{{ event.event_date }}" required>
+                </div>
+                <div class="form-group">
+                    <label for="event-time">Start time</label>
+                    <input type="time" id="event-time" name="time" value="{{ event.event_time }}" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="event-duration">Duration</label>
+                <select id="event-duration" name="duration">
+                    {% for minutes in durations %}
+                        <option value="{{ minutes }}" {% if minutes == event.duration_minutes %}selected{% endif %}>
+                            {% if minutes % 60 %}{{ minutes // 60 }} h {{ minutes % 60 }} min{% else %}{{ minutes // 60 }} hour{{ "s" if minutes > 60 }}{% endif %}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label id="participants-label">Participants</label>
+                <div class="event-participants" role="group" aria-labelledby="participants-label">
+                    {% for pid in participant_ids %}
+                        <label class="event-participant">
+                            <input
+                                type="checkbox"
+                                name="participant_ids"
+                                value="{{ pid }}"
+                                {% if pid in event.participant_steam_ids %}checked{% endif %}
+                            >
+                            {% if people[pid].avatar %}
+                                <img src="{{ people[pid].avatar }}" alt="" class="event-participant-avatar">
+                            {% endif %}
+                            <span>{{ people[pid].name }}</span>
+                        </label>
+                    {% else %}
+                        <p class="muted-text">The organiser has no saved friends to invite.</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="event-form-actions">
+                <a href="/admin" class="button button-ghost">Cancel</a>
+                <button type="submit">Save changes</button>
+            </div>
+        </form>
+
+        <form method="post" action="/admin/events/{{ event.event_id }}/delete" class="admin-danger-zone"
+              onsubmit="return confirm('Delete this event for everyone? This can\'t be undone.');">
+            <div>
+                <strong>Delete this event</strong>
+                <p class="muted-text">Removes it from everyone's calendar.</p>
+            </div>
+            <button type="submit" class="button button-danger">Delete event</button>
+        </form>
+    </main>
+
+    {% include "footer.html" %}
+</body>
+</html>

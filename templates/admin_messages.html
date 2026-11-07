@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ person.name }}'s messages | Admin | Game Night</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    {% include "navbar.html" %}
+
+    <main class="container settings-container">
+        <a class="admin-back" href="/admin">&larr; Back to Admin</a>
+
+        <div class="admin-person admin-person-large">
+            {% if person.avatar %}
+                <img src="{{ person.avatar }}" alt="" width="56" height="56">
+            {% endif %}
+            <div>
+                <h1>{{ person.name }}'s messages</h1>
+                <p class="muted-text">Steam ID {{ user_id }}</p>
+            </div>
+        </div>
+
+        <div class="notice notice-admin" role="status">
+            <span class="navbar-admin-badge">Admin</span>
+            Pick a conversation to read it and send messages as {{ person.name }}.
+            Recipients will see them as coming from {{ person.name }}.
+        </div>
+
+        {% if conversations %}
+            <section class="settings-card" aria-labelledby="conversations-heading">
+                <div class="settings-card-header">
+                    <h2 id="conversations-heading">Conversations</h2>
+                </div>
+
+                <ul class="conversation-list">
+                    {% for convo in conversations %}
+                        <li>
+                            <a class="conversation-item" href="/admin/users/{{ user_id }}/messages/{{ convo.steamid }}">
+                                {% if people[convo.steamid].avatar %}
+                                    <img src="{{ people[convo.steamid].avatar }}" alt="" width="40" height="40" loading="lazy">
+                                {% endif %}
+                                <div class="conversation-text">
+                                    <strong>{{ people[convo.steamid].name }}</strong>
+                                    <span class="muted-text conversation-preview">
+                                        {% if convo.last_from_me %}{{ person.name }}: {% endif %}{{ convo.last_body }}
+                                    </span>
+                                </div>
+                                {% if convo.unread_count %}
+                                    <span class="unread-badge" title="Unread by {{ person.name }}">{{ convo.unread_count }}</span>
+                                {% endif %}
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </section>
+        {% endif %}
+
+        {% if groups %}
+            <section class="settings-card" aria-labelledby="groups-heading">
+                <div class="settings-card-header">
+                    <h2 id="groups-heading">Group chats</h2>
+                </div>
+
+                <ul class="conversation-list">
+                    {% for group in groups %}
+                        <li>
+                            <a class="conversation-item" href="/admin/users/{{ user_id }}/groups/{{ group.group_id }}">
+                                <span class="group-avatar" aria-hidden="true">
+                                    <span class="group-avatar-icon">{{ group.member_ids | length }}</span>
+                                </span>
+                                <div class="conversation-text">
+                                    <strong>{{ group.title }}</strong>
+                                    <span class="muted-text conversation-preview">
+                                        {% if group.last_kind == "message" %}{{ people[group.last_sender].name if group.last_sender in people else group.last_sender }}: {{ group.last_body }}{% else %}{{ group.member_ids | length }} people{% endif %}
+                                    </span>
+                                </div>
+                                {% if group.unread_count %}
+                                    <span class="unread-badge" title="Unread by {{ person.name }}">{{ group.unread_count }}</span>
+                                {% endif %}
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </section>
+        {% endif %}
+
+        {% if new_contacts %}
+            <section class="settings-card" aria-labelledby="new-heading">
+                <div class="settings-card-header">
+                    <h2 id="new-heading">Start a new conversation</h2>
+                    <p class="muted-text">{{ person.name }}'s friends they haven't messaged yet.</p>
+                </div>
+
+                <ul class="conversation-list">
+                    {% for contact in new_contacts %}
+                        <li>
+                            <a class="conversation-item" href="/admin/users/{{ user_id }}/messages/{{ contact }}">
+                                {% if people[contact].avatar %}
+                                    <img src="{{ people[contact].avatar }}" alt="" width="40" height="40" loading="lazy">
+                                {% endif %}
+                                <div class="conversation-text">
+                                    <strong>{{ people[contact].name }}</strong>
+                                </div>
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </section>
+        {% endif %}
+
+        {% if not conversations and not groups and not new_contacts %}
+            <div class="empty-state">
+                <p>{{ person.name }} has no conversations or saved friends yet.</p>
+            </div>
+        {% endif %}
+    </main>
+
+    {% include "footer.html" %}
+</body>
+</html>

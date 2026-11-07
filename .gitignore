@@ -90,3 +90,5 @@ Desktop.ini
 
 # Linux
 *~
+# Profile pictures uploaded through the admin dashboard
+app/static/avatars/
