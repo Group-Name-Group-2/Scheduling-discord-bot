@@ -98,8 +98,41 @@ def get_player_summaries(steam_ids: list[str]) -> dict:
                 "steamid": player["steamid"],
                 "personaname": player.get("personaname", "Unknown Player"),
                 "avatarfull": player.get("avatarfull", ""),
+                "avatarmedium": player.get("avatarmedium", ""),
                 "profileurl": player.get("profileurl", "")
             }
+
+    return apply_profile_overrides(profiles, steam_ids)
+
+
+def apply_profile_overrides(profiles: dict, steam_ids: list[str]) -> dict:
+    """
+    Swap in any display name / avatar an admin has set (see the admin
+    dashboard). Every page gets names and pictures through
+    get_player_summaries, so doing it here covers the whole site.
+    """
+    # Imported here so steam_api still works without the database.
+    from database import get_profile_overrides
+
+    try:
+        overrides = get_profile_overrides(list(steam_ids))
+    except Exception:
+        return profiles
+
+    for steam_id, override in overrides.items():
+        profile = profiles.setdefault(steam_id, {
+            "steamid": steam_id,
+            "personaname": steam_id,
+            "avatarfull": "",
+            "avatarmedium": "",
+            "profileurl": "",
+        })
+
+        if override["display_name"]:
+            profile["personaname"] = override["display_name"]
+        if override["avatar_path"]:
+            profile["avatarfull"] = override["avatar_path"]
+            profile["avatarmedium"] = override["avatar_path"]
 
     return profiles
 
@@ -139,4 +172,44 @@ def get_game_details(app_id: int) -> dict | None:
         ],
         "header_image": game.get("header_image", ""),
         "website": game.get("website", ""),
+    }
+
+class SteamRateLimited(Exception):
+    """The Steam Store API answered 429 Too Many Requests."""
+
+
+def get_content_rating(app_id: int) -> dict | None:
+    """
+    A game's mature-content info from the Steam Store:
+    {"descriptor_ids": [int, ...], "required_age": int}.
+    None if Steam has no store data for it (removed, region-locked or
+    some adult-only titles). Raises SteamRateLimited on 429.
+    """
+    response = requests.get(
+        "https://store.steampowered.com/api/appdetails",
+        params={"appids": app_id, "l": "en"},
+        timeout=15,
+    )
+
+    if response.status_code == 429:
+        raise SteamRateLimited()
+
+    response.raise_for_status()
+    result = (response.json() or {}).get(str(app_id)) or {}
+
+    if not result.get("success"):
+        return None
+
+    data = result.get("data") or {}
+
+    try:
+        required_age = int(data.get("required_age") or 0)
+    except (TypeError, ValueError):
+        required_age = 0
+
+    return {
+        "descriptor_ids": [
+            int(i) for i in (data.get("content_descriptors") or {}).get("ids") or []
+        ],
+        "required_age": required_age,
     }

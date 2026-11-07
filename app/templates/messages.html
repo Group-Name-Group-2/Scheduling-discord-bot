@@ -43,7 +43,10 @@
         {% endif %}
 
         <section class="results-section">
-            <h2>Conversations</h2>
+            <div class="section-heading-row">
+                <h2>Conversations</h2>
+                <a class="button button-small" href="/messages/groups/new">New group chat</a>
+            </div>
 
             {% if conversations %}
                 <ul class="conversation-list">
@@ -51,11 +54,19 @@
                         <li>
                             <a
                                 class="conversation-item{% if convo.unread_count %} has-unread{% endif %}"
-                                href="/messages/{{ convo.steamid }}"
+                                href="{{ convo.url }}"
                             >
-                                {% if convo.avatar %}
+                                {% if convo.is_group %}
+                                    <span class="group-avatar" aria-hidden="true">
+                                        {% for avatar in convo.avatars %}
+                                            <img src="{{ avatar }}" alt="" width="32" height="32" loading="lazy">
+                                        {% else %}
+                                            <span class="group-avatar-icon">{{ convo.member_count }}</span>
+                                        {% endfor %}
+                                    </span>
+                                {% elif convo.avatars %}
                                     <img
-                                        src="{{ convo.avatar }}"
+                                        src="{{ convo.avatars[0] }}"
                                         alt=""
                                         width="48"
                                         height="48"
@@ -64,10 +75,11 @@
                                 {% endif %}
 
                                 <div class="conversation-text">
-                                    <strong>{{ convo.name }}</strong>
-                                    <span class="muted-text conversation-preview">
-                                        {% if convo.last_from_me %}You: {% endif %}{{ convo.last_body }}
-                                    </span>
+                                    <strong>
+                                        {{ convo.title }}
+                                        {% if convo.is_group %}<span class="group-member-count">· {{ convo.member_count }} people</span>{% endif %}
+                                    </strong>
+                                    <span class="muted-text conversation-preview">{{ convo.preview }}</span>
                                 </div>
 
                                 {% if convo.unread_count %}

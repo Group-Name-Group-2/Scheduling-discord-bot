@@ -1,7 +1,8 @@
 """
 messages_routes.py
 
-Direct messages between Steam friends.
+Direct messages between Steam friends, and the Messages inbox (which
+also lists group chats; those live in group_routes.py).
 
 Rules:
 - You must be signed in with Steam.
@@ -20,6 +21,7 @@ from database import (
     MAX_MESSAGE_LENGTH,
     get_conversation,
     get_conversation_summaries,
+    get_group_summaries,
     get_saved_friends,
     get_unread_message_count,
     get_user_settings,
@@ -28,6 +30,7 @@ from database import (
     save_message,
 )
 from email_service import app_base_url
+from group_routes import group_title, message_people_ids, notice_text, people_info
 from notifications import mark_viewing, notify_new_message
 from steam_api import get_player_summaries
 
@@ -61,30 +64,73 @@ def messages_inbox(request: Request):
         return RedirectResponse(url="/", status_code=303)
 
     conversations = get_conversation_summaries(steam_id)
+    groups = get_group_summaries(steam_id)
     friends = get_saved_friends(steam_id)
 
     # Friends you haven't messaged yet, for starting a new conversation.
     talked_to = {c["steamid"] for c in conversations}
     new_chat_friends = [f for f in friends if f["steamid"] not in talked_to]
 
-    profiles = _profiles(
+    group_messages = [
+        {"sender_steam_id": g["last_sender"], "kind": g["last_kind"], "body": g["last_body"]}
+        for g in groups
+    ]
+    people = people_info(
         [c["steamid"] for c in conversations]
         + [f["steamid"] for f in new_chat_friends]
+        + [m for g in groups for m in g["member_ids"]]
+        + message_people_ids(group_messages)
     )
 
     for person in conversations + new_chat_friends:
-        profile = profiles.get(person["steamid"], {})
-        person["name"] = profile.get("personaname", person["steamid"])
-        person["avatar"] = profile.get("avatarfull")
+        person["name"] = people[person["steamid"]]["name"]
+        person["avatar"] = people[person["steamid"]]["avatar"]
 
     new_chat_friends.sort(key=lambda f: f["name"].lower())
+
+    # One list of direct and group chats, most recent first.
+    inbox = [
+        {
+            "url": f"/messages/{c['steamid']}",
+            "title": c["name"],
+            "avatars": [c["avatar"]] if c["avatar"] else [],
+            "preview": ("You: " if c["last_from_me"] else "") + c["last_body"],
+            "unread_count": c["unread_count"],
+            "last_created_at": c["last_created_at"],
+            "is_group": False,
+        }
+        for c in conversations
+    ]
+
+    for group, last in zip(groups, group_messages):
+        if last["kind"] == "message":
+            sender = last["sender_steam_id"]
+            who = "You" if sender == steam_id else people[sender]["name"]
+            preview = f"{who}: {last['body']}"
+        else:
+            preview = notice_text(last, steam_id, people)
+
+        others = [m for m in group["member_ids"] if m != steam_id]
+
+        inbox.append({
+            "url": f"/messages/groups/{group['group_id']}",
+            "title": group_title(group["name"], group["member_ids"], steam_id, people),
+            "avatars": [people[m]["avatar"] for m in others if people[m]["avatar"]][:2],
+            "preview": preview,
+            "unread_count": group["unread_count"],
+            "last_created_at": group["last_created_at"],
+            "is_group": True,
+            "member_count": len(group["member_ids"]),
+        })
+
+    inbox.sort(key=lambda item: item["last_created_at"], reverse=True)
 
     return templates.TemplateResponse(
         request=request,
         name="messages.html",
         context={
             "steam_id": steam_id,
-            "conversations": conversations,
+            "conversations": inbox,
             "new_chat_friends": new_chat_friends,
             "user_settings": get_user_settings(steam_id),
         },

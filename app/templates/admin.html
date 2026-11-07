@@ -16,7 +16,7 @@
 
     <main class="container">
         <h1>Admin</h1>
-        <p class="page-subtitle">Manage every user's email and schedule, and every game night on the site.</p>
+        <p class="page-subtitle">Manage every user's profile, email and schedule, and every game night on the site.</p>
 
         {% if status_message %}
             <div class="notice {% if status_is_error %}notice-error{% else %}notice-success{% endif %}" role="status">
@@ -77,7 +77,8 @@
                                         {{ user.last_synced[:10] if user.last_synced else "Never" }}
                                     </td>
                                     <td class="admin-actions">
-                                        <a class="button button-ghost button-small" href="/admin/users/{{ user.steam_id }}">Edit email</a>
+                                        <a class="button button-ghost button-small" href="/admin/users/{{ user.steam_id }}">Edit profile</a>
+                                        <a class="button button-ghost button-small" href="/admin/users/{{ user.steam_id }}/messages">Messages</a>
                                         <a class="button button-ghost button-small" href="/availability?user={{ user.steam_id }}">Edit schedule</a>
                                     </td>
                                 </tr>
@@ -135,6 +136,161 @@
                 </div>
             {% else %}
                 <div class="empty-state"><p>No events have been created yet.</p></div>
+            {% endif %}
+        </section>
+
+        <section class="admin-section" aria-labelledby="libraries-heading">
+            <h2 id="libraries-heading">Steam libraries</h2>
+            <p class="muted-text">
+                Re-download every user's game library from Steam. Runs in the background;
+                private libraries are skipped and keep what was saved before.
+            </p>
+
+            <form method="post" action="/admin/libraries/refresh" class="settings-row">
+                <button type="submit" {% if refresh.running %}disabled{% endif %}>
+                    {% if refresh.running %}Refreshing…{% else %}Refresh all libraries{% endif %}
+                </button>
+                <span class="muted-text">
+                    {% if refresh.running %}
+                        Started {{ refresh.started_at }}: {{ refresh.updated + refresh.unavailable }} of {{ refresh.total }} checked.
+                    {% elif refresh.finished_at %}
+                        Last refresh {{ refresh.finished_at }}: {{ refresh.updated }} updated{% if refresh.unavailable %}, {{ refresh.unavailable }} private or unavailable{% endif %}.
+                    {% else %}
+                        Not refreshed since the server started.
+                    {% endif %}
+                </span>
+            </form>
+
+            <form method="post" action="/admin/libraries/max-age" class="settings-form">
+                <label for="library-max-age">Reuse libraries synced within (minutes)</label>
+                <div class="settings-input-row">
+                    <input
+                        id="library-max-age"
+                        type="number"
+                        name="minutes"
+                        min="0"
+                        max="{{ max_library_max_age }}"
+                        step="1"
+                        value="{{ library_max_age }}"
+                        required
+                    >
+                    <button type="submit">Save</button>
+                </div>
+                <p class="muted-text">
+                    Sign-in, shared games and friend syncs use the saved library instead of asking Steam
+                    if it was downloaded this recently. 0 always asks Steam. Refresh all libraries and
+                    un-hiding a game always ask Steam.
+                </p>
+            </form>
+        </section>
+
+        <section class="admin-section" aria-labelledby="content-heading">
+            <h2 id="content-heading">Adult content filter</h2>
+            <p class="muted-text">
+                Every game is checked once against the content descriptors its developer declared on Steam.
+                Games with adult sexual content are hidden automatically and listed under Hidden games,
+                where you can un-hide any that were flagged by mistake. New games are checked after each library sync.
+            </p>
+
+            <div class="admin-stats">
+                <div class="admin-stat"><strong>{{ content_counts.sfw }}</strong><span>Safe</span></div>
+                <div class="admin-stat"><strong>{{ content_counts.nsfw }}</strong><span>Auto-hidden</span></div>
+                <div class="admin-stat"><strong>{{ content_counts.unknown }}</strong><span>No Steam data</span></div>
+                <div class="admin-stat"><strong>{{ content_counts.unrated }}</strong><span>Not checked yet</span></div>
+            </div>
+
+            <form method="post" action="/admin/content-check" class="settings-row">
+                <button type="submit" {% if content.running or not content_counts.unrated %}disabled{% endif %}>
+                    {% if content.running %}Checking…{% else %}Check unchecked games{% endif %}
+                </button>
+                <span class="muted-text">
+                    {% if content.running %}
+                        Started {{ content.started_at }}: {{ content.checked }} of {{ content.total }} checked, {{ content.hidden }} hidden.
+                        Steam limits lookups, so this takes about 1.6 s per game.
+                    {% elif content.finished_at %}
+                        Last check {{ content.finished_at }}: {{ content.checked }} checked, {{ content.hidden }} hidden.
+                    {% else %}
+                        Not run since the server started.
+                    {% endif %}
+                    {% if content.error %}<br><strong>{{ content.error }}</strong>{% endif %}
+                </span>
+            </form>
+
+            {% if unknown_games %}
+                <details>
+                    <summary>{{ unknown_games | length }} visible game(s) Steam had no content data for</summary>
+                    <ul>
+                        {% for game in unknown_games %}
+                            <li>{{ game.name }} <span class="admin-sub">({{ game.appid }})</span></li>
+                        {% endfor %}
+                    </ul>
+                    <p class="muted-text">Hide any of these with the form below if needed.</p>
+                </details>
+            {% endif %}
+        </section>
+
+        <section class="admin-section" aria-labelledby="games-heading">
+            <h2 id="games-heading">Hidden games</h2>
+            <p class="muted-text">
+                Hidden games are removed from every library and skipped on future Steam syncs,
+                so they never appear in libraries, shared games or recommendations.
+            </p>
+
+            <form method="post" action="/admin/games/ignore" class="settings-form">
+                <label for="ignore-app-id">Steam app ID</label>
+                <div class="settings-input-row">
+                    <input
+                        id="ignore-app-id"
+                        type="text"
+                        inputmode="numeric"
+                        pattern="[0-9]+"
+                        name="app_id"
+                        list="known-games"
+                        placeholder="Start typing a game name or app ID"
+                        required
+                    >
+                    <input type="text" name="name" maxlength="200" placeholder="Name (optional)" aria-label="Name (optional)">
+                    <button type="submit">Hide game</button>
+                </div>
+                <datalist id="known-games">
+                    {% for game in known_games %}
+                        <option value="{{ game.appid }}">{{ game.name }}</option>
+                    {% endfor %}
+                </datalist>
+            </form>
+
+            {% if ignored_games %}
+                <div class="admin-table-wrap">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Game</th>
+                                <th scope="col">Reason</th>
+                                <th scope="col">Hidden since</th>
+                                <th scope="col"><span class="visually-hidden">Actions</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for game in ignored_games %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ game.name }}</strong>
+                                        <div class="admin-sub">{{ game.app_id }}</div>
+                                    </td>
+                                    <td class="muted-text">{{ game.reason or "Hidden by an admin" }}</td>
+                                    <td class="admin-nowrap muted-text">{{ game.ignored_at[:10] }}</td>
+                                    <td class="admin-actions">
+                                        <form method="post" action="/admin/games/{{ game.app_id }}/unignore">
+                                            <button type="submit" class="button button-ghost button-small">Un-hide</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state"><p>No games are hidden.</p></div>
             {% endif %}
         </section>
     </main>

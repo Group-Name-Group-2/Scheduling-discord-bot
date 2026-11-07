@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ people[user_id].name }} → {{ people[other_id].name }} | Admin | Game Night</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    {% include "navbar.html" %}
+
+    <main class="container admin-chat-container">
+        <a class="admin-back" href="/admin/users/{{ user_id }}/messages">&larr; Back to {{ people[user_id].name }}'s messages</a>
+
+        <h1>{{ people[user_id].name }} &amp; {{ people[other_id].name }}</h1>
+
+        <div class="notice notice-admin" role="status">
+            <span class="navbar-admin-badge">Admin</span>
+            You're sending as {{ people[user_id].name }}. {{ people[other_id].name }} will see
+            these messages as coming from {{ people[user_id].name }}.
+        </div>
+
+        {% if status_message %}
+            <div class="notice {% if status_is_error %}notice-error{% else %}notice-success{% endif %}" role="status">
+                {{ status_message }}
+            </div>
+        {% endif %}
+
+        <div class="chat-messages admin-chat-messages" id="admin-chat-messages">
+            {% for message in messages %}
+                <div class="chat-message {% if message.sender_steam_id == user_id %}from-me{% else %}from-them{% endif %}">
+                    <p class="chat-body">{{ message.body }}</p>
+                    <span class="chat-time">
+                        {{ message.created_at[:16] | replace("T", " ") }} UTC
+                        {% if message.sent_by_steam_id %}
+                            · sent by admin {{ people[message.sent_by_steam_id].name }}
+                        {% endif %}
+                    </span>
+                </div>
+            {% else %}
+                <p class="muted-text chat-empty">No messages yet.</p>
+            {% endfor %}
+        </div>
+
+        <form method="post" action="/admin/users/{{ user_id }}/messages/{{ other_id }}" class="chat-form">
+            <label for="admin-chat-input" class="visually-hidden">Message</label>
+            <textarea
+                id="admin-chat-input"
+                name="body"
+                rows="2"
+                maxlength="{{ max_length }}"
+                placeholder="Message {{ people[other_id].name }} as {{ people[user_id].name }}..."
+                required
+            ></textarea>
+            <button type="submit">Send as {{ people[user_id].name }}</button>
+        </form>
+    </main>
+
+    {% include "footer.html" %}
+
+    <script>
+        // Start scrolled to the newest message.
+        const list = document.getElementById("admin-chat-messages");
+        list.scrollTop = list.scrollHeight;
+    </script>
+</body>
+</html>

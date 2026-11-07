@@ -18,12 +18,40 @@ def init_db():
             CREATE TABLE IF NOT EXISTS steam_users (
                 steam_id TEXT PRIMARY KEY,
                 last_synced TEXT,
-                is_admin INTEGER NOT NULL DEFAULT 0
+                is_admin INTEGER NOT NULL DEFAULT 0,
+                display_name TEXT,
+                avatar_path TEXT
             );
 
             CREATE TABLE IF NOT EXISTS games (
                 app_id INTEGER PRIMARY KEY,
                 name TEXT NOT NULL
+            );
+
+            -- Games admins have hidden: never shown and never stored in
+            -- user_games (or games, unless an existing event needs the name).
+            -- No foreign key, so a game can be ignored before anyone owns it.
+            CREATE TABLE IF NOT EXISTS ignored_games (
+                app_id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                ignored_at TEXT NOT NULL,
+                reason TEXT              -- NULL = hidden by an admin
+            );
+
+            -- Admin-editable settings (key/value); defaults live in code.
+            CREATE TABLE IF NOT EXISTS app_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+
+            -- Steam's mature-content flags per game (see content_filter.py).
+            -- One row per game ever checked, so each game is looked up once.
+            CREATE TABLE IF NOT EXISTS content_ratings (
+                app_id INTEGER PRIMARY KEY,
+                status TEXT NOT NULL,    -- 'sfw', 'nsfw' or 'unknown'
+                descriptor_ids TEXT,     -- comma-separated Steam descriptor IDs
+                required_age INTEGER,
+                checked_at TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS user_games (
@@ -85,7 +113,9 @@ def init_db():
                 recipient_steam_id TEXT NOT NULL,
                 body TEXT NOT NULL,
                 created_at TEXT NOT NULL,
-                read_at TEXT
+                read_at TEXT,
+                -- Set when an admin sent this message as sender_steam_id.
+                sent_by_steam_id TEXT
             );
 
             CREATE INDEX IF NOT EXISTS idx_messages_pair
@@ -93,6 +123,54 @@ def init_db():
 
             CREATE INDEX IF NOT EXISTS idx_messages_recipient_unread
                 ON messages (recipient_steam_id, read_at);
+
+            -- Group conversations (3+ people). One-to-one chats stay in
+            -- the messages table above.
+            CREATE TABLE IF NOT EXISTS group_chats (
+                group_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT,                    -- NULL: show member names
+                created_by TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS group_members (
+                group_id INTEGER NOT NULL,
+                steam_id TEXT NOT NULL,
+                joined_at TEXT NOT NULL,
+                -- Newest group message this member has seen.
+                last_read_id INTEGER NOT NULL DEFAULT 0,
+
+                PRIMARY KEY (group_id, steam_id),
+
+                FOREIGN KEY (group_id)
+                    REFERENCES group_chats(group_id)
+                    ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_group_members_user
+                ON group_members (steam_id);
+
+            CREATE TABLE IF NOT EXISTS group_messages (
+                message_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                group_id INTEGER NOT NULL,
+                sender_steam_id TEXT NOT NULL,
+                -- 'message' for normal messages; 'created', 'added',
+                -- 'left' and 'renamed' for notices shown in the chat.
+                kind TEXT NOT NULL DEFAULT 'message',
+                -- Message text, the added steam IDs (comma separated)
+                -- or the new group name, depending on kind.
+                body TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                -- Set when an admin sent this message as sender_steam_id.
+                sent_by_steam_id TEXT,
+
+                FOREIGN KEY (group_id)
+                    REFERENCES group_chats(group_id)
+                    ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_group_messages_group
+                ON group_messages (group_id, message_id);
 
             CREATE TABLE IF NOT EXISTS availability (
                 steam_id TEXT NOT NULL,
@@ -127,6 +205,33 @@ def init_db():
                 "ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0"
             )
 
+        # Admin overrides for the Steam display name and avatar, and when
+        # the library was last downloaded from Steam (separate from
+        # last_synced, which the dashboard shows as the last sign-in).
+        for column in ("display_name", "avatar_path", "library_synced_at"):
+            if column not in columns:
+                connection.execute(
+                    f"ALTER TABLE steam_users ADD COLUMN {column} TEXT"
+                )
+
+        ignored_columns = {
+            row[1]
+            for row in connection.execute("PRAGMA table_info(ignored_games)")
+        }
+
+        if "reason" not in ignored_columns:
+            connection.execute("ALTER TABLE ignored_games ADD COLUMN reason TEXT")
+
+        message_columns = {
+            row[1]
+            for row in connection.execute("PRAGMA table_info(messages)")
+        }
+
+        if "sent_by_steam_id" not in message_columns:
+            connection.execute(
+                "ALTER TABLE messages ADD COLUMN sent_by_steam_id TEXT"
+            )
+
 
 def is_admin(steam_id: str) -> bool:
     init_db()
@@ -153,26 +258,46 @@ def set_admin(steam_id: str, admin: bool = True) -> bool:
     return cursor.rowcount == 1
 
 
-def save_owned_games(steam_id: str, games: list):
+def save_owned_games(steam_id: str, games: list, mark_synced: bool = True):
+    """
+    Save a user's Steam library. mark_synced=False leaves last_synced
+    alone (the admin "refresh all" uses it so the dashboard's last
+    sign-in column isn't overwritten for everyone).
+    """
     init_db()
 
     synced_at = datetime.now(timezone.utc).isoformat()
 
     with get_connection() as connection:
+        ignored = _ignored_app_ids(connection)
+
         # Register the user if they do not already exist.
-        connection.execute("""
-            INSERT INTO steam_users (steam_id, last_synced)
-            VALUES (?, ?)
-            ON CONFLICT(steam_id)
-            DO UPDATE SET last_synced = excluded.last_synced
-        """, (steam_id, synced_at))
+        if mark_synced:
+            connection.execute("""
+                INSERT INTO steam_users (steam_id, last_synced)
+                VALUES (?, ?)
+                ON CONFLICT(steam_id)
+                DO UPDATE SET last_synced = excluded.last_synced
+            """, (steam_id, synced_at))
+        else:
+            connection.execute(
+                "INSERT OR IGNORE INTO steam_users (steam_id) VALUES (?)",
+                (steam_id,),
+            )
+
+        # Always record when the library itself was downloaded, so later
+        # syncs can skip Steam while it's recent (see library_service.py).
+        connection.execute(
+            "UPDATE steam_users SET library_synced_at = ? WHERE steam_id = ?",
+            (synced_at, steam_id),
+        )
 
         for game in games:
             app_id = game.get("appid")
             name = game.get("name") or "Unknown Game"
             playtime = game.get("playtime_forever", 0)
 
-            if app_id is None:
+            if app_id is None or app_id in ignored:
                 continue
 
             # Save the game itself.
@@ -454,8 +579,8 @@ def get_event_details_for_user(
 MAX_MESSAGE_LENGTH = 2000
 
 
-def _message_row_to_dict(row) -> dict:
-    return {
+def _message_row_to_dict(row, include_audit: bool = False) -> dict:
+    message = {
         "message_id": row[0],
         "sender_steam_id": row[1],
         "recipient_steam_id": row[2],
@@ -464,8 +589,23 @@ def _message_row_to_dict(row) -> dict:
         "read_at": row[5],
     }
 
+    # Who really sent it is only for admin views, never regular users.
+    if include_audit:
+        message["sent_by_steam_id"] = row[6]
 
-def save_message(sender_steam_id: str, recipient_steam_id: str, body: str) -> dict:
+    return message
+
+
+def save_message(
+    sender_steam_id: str,
+    recipient_steam_id: str,
+    body: str,
+    sent_by_steam_id: str | None = None,
+) -> dict:
+    """
+    Save a message from sender_steam_id. sent_by_steam_id records the
+    admin who actually sent it when sending on someone's behalf.
+    """
     init_db()
 
     created_at = datetime.now(timezone.utc).isoformat()
@@ -474,11 +614,12 @@ def save_message(sender_steam_id: str, recipient_steam_id: str, body: str) -> di
         cursor = connection.execute(
             """
             INSERT INTO messages (
-                sender_steam_id, recipient_steam_id, body, created_at
+                sender_steam_id, recipient_steam_id, body, created_at,
+                sent_by_steam_id
             )
-            VALUES (?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?)
             """,
-            (sender_steam_id, recipient_steam_id, body, created_at),
+            (sender_steam_id, recipient_steam_id, body, created_at, sent_by_steam_id),
         )
         message_id = cursor.lastrowid
 
@@ -497,10 +638,12 @@ def get_conversation(
     other_steam_id: str,
     after_id: int = 0,
     limit: int = 200,
+    include_audit: bool = False,
 ) -> list[dict]:
     """
     Messages between two users, oldest first. With after_id, only
-    messages newer than that ID (used for polling).
+    messages newer than that ID (used for polling). include_audit adds
+    sent_by_steam_id (admin views only).
     """
     init_db()
 
@@ -510,7 +653,7 @@ def get_conversation(
             SELECT * FROM (
                 SELECT
                     message_id, sender_steam_id, recipient_steam_id,
-                    body, created_at, read_at
+                    body, created_at, read_at, sent_by_steam_id
                 FROM messages
                 WHERE (
                     (sender_steam_id = ? AND recipient_steam_id = ?)
@@ -525,7 +668,7 @@ def get_conversation(
             (steam_id, other_steam_id, other_steam_id, steam_id, after_id, limit),
         ).fetchall()
 
-    return [_message_row_to_dict(row) for row in rows]
+    return [_message_row_to_dict(row, include_audit) for row in rows]
 
 
 def mark_conversation_read(steam_id: str, other_steam_id: str) -> None:
@@ -619,18 +762,378 @@ def has_messaged(sender_steam_id: str, recipient_steam_id: str) -> bool:
 
 
 def get_unread_message_count(steam_id: str) -> int:
+    """Unread direct messages plus unread group messages."""
     init_db()
 
     with get_connection() as connection:
-        row = connection.execute(
+        direct = connection.execute(
             """
             SELECT COUNT(*) FROM messages
             WHERE recipient_steam_id = ? AND read_at IS NULL
             """,
             (steam_id,),
+        ).fetchone()[0]
+
+        group = connection.execute(
+            """
+            SELECT COUNT(*)
+            FROM group_members gm
+            JOIN group_messages m ON m.group_id = gm.group_id
+            WHERE gm.steam_id = ?
+              AND m.message_id > gm.last_read_id
+              AND m.sender_steam_id != gm.steam_id
+              AND m.kind = 'message'
+            """,
+            (steam_id,),
+        ).fetchone()[0]
+
+    return direct + group
+
+
+# =========================
+# Group conversations
+# =========================
+
+MAX_GROUP_MEMBERS = 25
+MAX_GROUP_NAME_LENGTH = 50
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _add_group_notice(connection, group_id: int, actor: str, kind: str, body: str) -> int:
+    cursor = connection.execute(
+        """
+        INSERT INTO group_messages (group_id, sender_steam_id, kind, body, created_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (group_id, actor, kind, body, _now()),
+    )
+    return cursor.lastrowid
+
+
+def create_group(creator_steam_id: str, member_ids: list[str], name: str | None = None) -> int:
+    """Create a group with the creator plus member_ids. Returns its ID."""
+    init_db()
+
+    members = list(dict.fromkeys([creator_steam_id, *member_ids]))[:MAX_GROUP_MEMBERS]
+    created_at = _now()
+
+    with get_connection() as connection:
+        group_id = connection.execute(
+            "INSERT INTO group_chats (name, created_by, created_at) VALUES (?, ?, ?)",
+            (name, creator_steam_id, created_at),
+        ).lastrowid
+
+        notice_id = _add_group_notice(connection, group_id, creator_steam_id, "created", "")
+
+        connection.executemany(
+            """
+            INSERT INTO group_members (group_id, steam_id, joined_at, last_read_id)
+            VALUES (?, ?, ?, ?)
+            """,
+            [(group_id, member, created_at, notice_id) for member in members],
+        )
+
+    return group_id
+
+
+def get_group(group_id: int) -> dict | None:
+    """The group's details and member IDs (in the order they joined)."""
+    init_db()
+
+    with get_connection() as connection:
+        row = connection.execute(
+            "SELECT group_id, name, created_by, created_at FROM group_chats WHERE group_id = ?",
+            (group_id,),
+        ).fetchone()
+
+        if row is None:
+            return None
+
+        members = connection.execute(
+            """
+            SELECT steam_id FROM group_members
+            WHERE group_id = ?
+            ORDER BY joined_at, rowid
+            """,
+            (group_id,),
+        ).fetchall()
+
+    return {
+        "group_id": row[0],
+        "name": row[1],
+        "created_by": row[2],
+        "created_at": row[3],
+        "member_ids": [m[0] for m in members],
+    }
+
+
+def is_group_member(group_id: int, steam_id: str) -> bool:
+    init_db()
+
+    with get_connection() as connection:
+        row = connection.execute(
+            "SELECT 1 FROM group_members WHERE group_id = ? AND steam_id = ?",
+            (group_id, steam_id),
+        ).fetchone()
+
+    return row is not None
+
+
+def add_group_members(group_id: int, actor_steam_id: str, member_ids: list[str]) -> list[str]:
+    """
+    Add people to a group (skipping existing members and anyone over the
+    size limit). New members can read the history but start with nothing
+    unread. Returns the IDs actually added.
+    """
+    init_db()
+
+    with get_connection() as connection:
+        existing = {
+            row[0] for row in connection.execute(
+                "SELECT steam_id FROM group_members WHERE group_id = ?", (group_id,)
+            )
+        }
+
+        room = max(MAX_GROUP_MEMBERS - len(existing), 0)
+        to_add = [m for m in dict.fromkeys(member_ids) if m not in existing][:room]
+
+        if not to_add:
+            return []
+
+        notice_id = _add_group_notice(
+            connection, group_id, actor_steam_id, "added", ",".join(to_add)
+        )
+        joined_at = _now()
+
+        connection.executemany(
+            """
+            INSERT INTO group_members (group_id, steam_id, joined_at, last_read_id)
+            VALUES (?, ?, ?, ?)
+            """,
+            [(group_id, member, joined_at, notice_id) for member in to_add],
+        )
+
+    return to_add
+
+
+def leave_group(group_id: int, steam_id: str) -> None:
+    """Remove a member. The group is deleted when its last member leaves."""
+    init_db()
+
+    with get_connection() as connection:
+        removed = connection.execute(
+            "DELETE FROM group_members WHERE group_id = ? AND steam_id = ?",
+            (group_id, steam_id),
+        ).rowcount
+
+        if not removed:
+            return
+
+        remaining = connection.execute(
+            "SELECT COUNT(*) FROM group_members WHERE group_id = ?", (group_id,)
+        ).fetchone()[0]
+
+        if remaining:
+            _add_group_notice(connection, group_id, steam_id, "left", "")
+        else:
+            connection.execute("DELETE FROM group_messages WHERE group_id = ?", (group_id,))
+            connection.execute("DELETE FROM group_chats WHERE group_id = ?", (group_id,))
+
+
+def rename_group(group_id: int, actor_steam_id: str, name: str | None) -> None:
+    """Set the group's name (None clears it, showing member names)."""
+    init_db()
+
+    with get_connection() as connection:
+        connection.execute(
+            "UPDATE group_chats SET name = ? WHERE group_id = ?", (name, group_id)
+        )
+        _add_group_notice(connection, group_id, actor_steam_id, "renamed", name or "")
+
+
+def _group_message_row_to_dict(row, include_audit: bool = False) -> dict:
+    message = {
+        "message_id": row[0],
+        "group_id": row[1],
+        "sender_steam_id": row[2],
+        "kind": row[3],
+        "body": row[4],
+        "created_at": row[5],
+    }
+
+    # Who really sent it is only for admin views, never regular users.
+    if include_audit:
+        message["sent_by_steam_id"] = row[6]
+
+    return message
+
+
+def save_group_message(
+    group_id: int,
+    sender_steam_id: str,
+    body: str,
+    sent_by_steam_id: str | None = None,
+) -> dict:
+    init_db()
+
+    created_at = _now()
+
+    with get_connection() as connection:
+        message_id = connection.execute(
+            """
+            INSERT INTO group_messages (
+                group_id, sender_steam_id, kind, body, created_at, sent_by_steam_id
+            )
+            VALUES (?, ?, 'message', ?, ?, ?)
+            """,
+            (group_id, sender_steam_id, body, created_at, sent_by_steam_id),
+        ).lastrowid
+
+        # Sending counts as having read the conversation, unless an admin
+        # sent it on the member's behalf.
+        if sent_by_steam_id is None:
+            connection.execute(
+                """
+                UPDATE group_members SET last_read_id = ?
+                WHERE group_id = ? AND steam_id = ?
+                """,
+                (message_id, group_id, sender_steam_id),
+            )
+
+    return {
+        "message_id": message_id,
+        "group_id": group_id,
+        "sender_steam_id": sender_steam_id,
+        "kind": "message",
+        "body": body,
+        "created_at": created_at,
+    }
+
+
+def get_group_messages(
+    group_id: int,
+    after_id: int = 0,
+    limit: int = 200,
+    include_audit: bool = False,
+) -> list[dict]:
+    """Messages and notices in a group, oldest first."""
+    init_db()
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT * FROM (
+                SELECT message_id, group_id, sender_steam_id, kind, body,
+                       created_at, sent_by_steam_id
+                FROM group_messages
+                WHERE group_id = ? AND message_id > ?
+                ORDER BY message_id DESC
+                LIMIT ?
+            )
+            ORDER BY message_id ASC
+            """,
+            (group_id, after_id, limit),
+        ).fetchall()
+
+    return [_group_message_row_to_dict(row, include_audit) for row in rows]
+
+
+def mark_group_read(group_id: int, steam_id: str) -> None:
+    init_db()
+
+    with get_connection() as connection:
+        connection.execute(
+            """
+            UPDATE group_members
+            SET last_read_id = COALESCE(
+                (SELECT MAX(message_id) FROM group_messages WHERE group_id = ?),
+                last_read_id
+            )
+            WHERE group_id = ? AND steam_id = ?
+            """,
+            (group_id, group_id, steam_id),
+        )
+
+
+def count_group_unread(group_id: int, steam_id: str) -> int:
+    """Unread messages (not notices) from others in a group."""
+    init_db()
+
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT COUNT(*)
+            FROM group_members gm
+            JOIN group_messages m ON m.group_id = gm.group_id
+            WHERE gm.group_id = ? AND gm.steam_id = ?
+              AND m.message_id > gm.last_read_id
+              AND m.sender_steam_id != gm.steam_id
+              AND m.kind = 'message'
+            """,
+            (group_id, steam_id),
         ).fetchone()
 
     return row[0]
+
+
+def get_group_summaries(steam_id: str) -> list[dict]:
+    """
+    One entry per group steam_id is in: members, the latest message or
+    notice, and the unread count. Most recent activity first.
+    """
+    init_db()
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                g.group_id,
+                g.name,
+                last.sender_steam_id,
+                last.kind,
+                last.body,
+                last.created_at,
+                (
+                    SELECT COUNT(*) FROM group_messages u
+                    WHERE u.group_id = g.group_id
+                      AND u.message_id > gm.last_read_id
+                      AND u.sender_steam_id != gm.steam_id
+                      AND u.kind = 'message'
+                ) AS unread_count,
+                (
+                    SELECT GROUP_CONCAT(steam_id) FROM (
+                        SELECT steam_id FROM group_members
+                        WHERE group_id = g.group_id
+                        ORDER BY joined_at, rowid
+                    )
+                ) AS member_ids
+            FROM group_members gm
+            JOIN group_chats g ON g.group_id = gm.group_id
+            JOIN group_messages last ON last.message_id = (
+                SELECT MAX(message_id) FROM group_messages WHERE group_id = g.group_id
+            )
+            WHERE gm.steam_id = ?
+            ORDER BY last.message_id DESC
+            """,
+            (steam_id,),
+        ).fetchall()
+
+    return [
+        {
+            "group_id": row[0],
+            "name": row[1],
+            "last_sender": row[2],
+            "last_kind": row[3],
+            "last_body": row[4],
+            "last_created_at": row[5],
+            "unread_count": row[6],
+            "member_ids": row[7].split(",") if row[7] else [],
+        }
+        for row in rows
+    ]
 
 
 # =========================
@@ -961,7 +1464,9 @@ def list_users() -> list[dict]:
                 u.last_synced,
                 u.is_admin,
                 s.email,
-                s.pending_email
+                s.pending_email,
+                u.display_name,
+                u.avatar_path
             FROM steam_users u
             LEFT JOIN user_settings s ON s.steam_id = u.steam_id
             ORDER BY u.last_synced DESC
@@ -975,6 +1480,8 @@ def list_users() -> list[dict]:
             "is_admin": bool(row[2]),
             "email": row[3],
             "pending_email": row[4],
+            "has_custom_name": row[5] is not None,
+            "has_custom_avatar": row[6] is not None,
         }
         for row in rows
     ]
@@ -989,6 +1496,63 @@ def user_exists(steam_id: str) -> bool:
         ).fetchone()
 
     return row is not None
+
+
+def get_profile_overrides(steam_ids: list[str]) -> dict[str, dict]:
+    """
+    steam_id -> {"display_name", "avatar_path"} for users an admin has
+    renamed or given a new picture. Users with no overrides are left out.
+    """
+    if not steam_ids:
+        return {}
+
+    init_db()
+    overrides = {}
+
+    with get_connection() as connection:
+        ids = list(dict.fromkeys(steam_ids))
+        for start in range(0, len(ids), 500):
+            batch = ids[start:start + 500]
+            placeholders = ",".join("?" * len(batch))
+            rows = connection.execute(
+                f"""
+                SELECT steam_id, display_name, avatar_path
+                FROM steam_users
+                WHERE steam_id IN ({placeholders})
+                  AND (display_name IS NOT NULL OR avatar_path IS NOT NULL)
+                """,
+                batch,
+            ).fetchall()
+
+            for steam_id, display_name, avatar_path in rows:
+                overrides[steam_id] = {
+                    "display_name": display_name,
+                    "avatar_path": avatar_path,
+                }
+
+    return overrides
+
+
+def admin_set_display_name(steam_id: str, display_name: str | None) -> None:
+    """Override a user's Steam name (None goes back to their Steam name)."""
+    init_db()
+
+    with get_connection() as connection:
+        connection.execute(
+            "UPDATE steam_users SET display_name = ? WHERE steam_id = ?",
+            (display_name, steam_id),
+        )
+
+
+def admin_set_avatar(steam_id: str, avatar_path: str | None) -> None:
+    """Override a user's Steam avatar (None goes back to their Steam one)."""
+    init_db()
+
+    with get_connection() as connection:
+        connection.execute(
+            "UPDATE steam_users SET avatar_path = ? WHERE steam_id = ?",
+            (avatar_path, steam_id),
+        )
 
 
 def admin_set_email(steam_id: str, email: str | None) -> None:
@@ -1011,6 +1575,273 @@ def admin_set_email(steam_id: str, email: str | None) -> None:
             """,
             (email, steam_id),
         )
+
+
+def get_setting(key: str) -> str | None:
+    init_db()
+
+    with get_connection() as connection:
+        row = connection.execute(
+            "SELECT value FROM app_settings WHERE key = ?", (key,)
+        ).fetchone()
+
+    return row[0] if row else None
+
+
+def set_setting(key: str, value: str) -> None:
+    init_db()
+
+    with get_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO app_settings (key, value) VALUES (?, ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value
+            """,
+            (key, value),
+        )
+
+
+def get_library_synced_at(steam_id: str) -> datetime | None:
+    """When steam_id's library was last downloaded from Steam (UTC)."""
+    init_db()
+
+    with get_connection() as connection:
+        row = connection.execute(
+            "SELECT library_synced_at FROM steam_users WHERE steam_id = ?",
+            (steam_id,),
+        ).fetchone()
+
+    if not row or not row[0]:
+        return None
+
+    try:
+        return datetime.fromisoformat(row[0])
+    except ValueError:
+        return None
+
+
+def mark_signed_in(steam_id: str) -> None:
+    """Update last_synced (the dashboard's last sign-in) without a library sync."""
+    init_db()
+
+    with get_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO steam_users (steam_id, last_synced) VALUES (?, ?)
+            ON CONFLICT(steam_id) DO UPDATE SET last_synced = excluded.last_synced
+            """,
+            (steam_id, datetime.now(timezone.utc).isoformat()),
+        )
+
+
+def _ignored_app_ids(connection) -> set[int]:
+    return {row[0] for row in connection.execute("SELECT app_id FROM ignored_games")}
+
+
+def list_ignored_games() -> list[dict]:
+    init_db()
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            "SELECT app_id, name, ignored_at, reason FROM ignored_games "
+            "ORDER BY name COLLATE NOCASE"
+        ).fetchall()
+
+    return [
+        {"app_id": row[0], "name": row[1], "ignored_at": row[2], "reason": row[3]}
+        for row in rows
+    ]
+
+
+def list_known_games() -> list[dict]:
+    """Every game in someone's library, for picking one to ignore."""
+    init_db()
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT g.app_id, g.name
+            FROM games g
+            WHERE EXISTS (SELECT 1 FROM user_games ug WHERE ug.app_id = g.app_id)
+            ORDER BY g.name COLLATE NOCASE
+            """
+        ).fetchall()
+
+    return [{"appid": row[0], "name": row[1]} for row in rows]
+
+
+def ignore_game(
+    app_id: int,
+    name: str | None = None,
+    reason: str | None = None,
+) -> tuple[str, int]:
+    """
+    Hide a game everywhere: add it to ignored_games and remove it from
+    every user's library. The games row is kept only if an event still
+    points at it (so that event keeps its name). Library syncs skip
+    ignored games, so it doesn't come back.
+
+    Returns (stored name, number of user libraries it was removed from).
+    """
+    init_db()
+
+    with get_connection() as connection:
+        if not name:
+            row = connection.execute(
+                "SELECT name FROM games WHERE app_id = ?", (app_id,)
+            ).fetchone()
+            name = row[0] if row else f"App {app_id}"
+
+        connection.execute(
+            """
+            INSERT INTO ignored_games (app_id, name, ignored_at, reason)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(app_id) DO UPDATE SET name = excluded.name
+            """,
+            (app_id, name, datetime.now(timezone.utc).isoformat(), reason),
+        )
+        # No steam_id filter: this clears the game from every user's library.
+        removed = connection.execute(
+            "DELETE FROM user_games WHERE app_id = ?", (app_id,)
+        ).rowcount
+        connection.execute(
+            """
+            DELETE FROM games
+            WHERE app_id = ?
+              AND NOT EXISTS (
+                  SELECT 1 FROM game_night_events e WHERE e.app_id = games.app_id
+              )
+            """,
+            (app_id,),
+        )
+
+    return name, removed
+
+
+def restore_game_ownership(app_id: int, name: str, owners: dict[str, int]) -> int:
+    """
+    Put an un-hidden game back into the libraries of owners
+    ({steam_id: playtime_forever}). Doesn't touch last_synced, since only
+    this one game was re-checked. Returns how many libraries got it back.
+    """
+    init_db()
+
+    if not owners:
+        return 0
+
+    with get_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO games (app_id, name) VALUES (?, ?)
+            ON CONFLICT(app_id) DO UPDATE SET name = excluded.name
+            """,
+            (app_id, name),
+        )
+        connection.executemany(
+            """
+            INSERT INTO user_games (steam_id, app_id, playtime_forever)
+            VALUES (?, ?, ?)
+            ON CONFLICT(steam_id, app_id)
+            DO UPDATE SET playtime_forever = excluded.playtime_forever
+            """,
+            [(steam_id, app_id, playtime) for steam_id, playtime in owners.items()],
+        )
+
+    return len(owners)
+
+
+def unignore_game(app_id: int) -> bool:
+    """Stop ignoring a game. Use restore_game_ownership to re-add it to libraries."""
+    init_db()
+
+    with get_connection() as connection:
+        cursor = connection.execute(
+            "DELETE FROM ignored_games WHERE app_id = ?", (app_id,)
+        )
+
+    return cursor.rowcount == 1
+
+
+def list_unrated_games() -> list[dict]:
+    """Owned, non-hidden games that haven't had their content checked yet."""
+    init_db()
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT g.app_id, g.name
+            FROM games g
+            WHERE EXISTS (SELECT 1 FROM user_games ug WHERE ug.app_id = g.app_id)
+              AND NOT EXISTS (SELECT 1 FROM content_ratings r WHERE r.app_id = g.app_id)
+              AND NOT EXISTS (SELECT 1 FROM ignored_games i WHERE i.app_id = g.app_id)
+            ORDER BY g.app_id
+            """
+        ).fetchall()
+
+    return [{"appid": row[0], "name": row[1]} for row in rows]
+
+
+def save_content_rating(
+    app_id: int,
+    status: str,
+    descriptor_ids: list[int],
+    required_age: int | None,
+) -> None:
+    init_db()
+
+    with get_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO content_ratings
+                (app_id, status, descriptor_ids, required_age, checked_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(app_id) DO UPDATE SET
+                status = excluded.status,
+                descriptor_ids = excluded.descriptor_ids,
+                required_age = excluded.required_age,
+                checked_at = excluded.checked_at
+            """,
+            (
+                app_id,
+                status,
+                ",".join(str(i) for i in descriptor_ids),
+                required_age,
+                datetime.now(timezone.utc).isoformat(),
+            ),
+        )
+
+
+def content_rating_counts() -> dict[str, int]:
+    """status -> number of games, plus 'unrated' for games still to check."""
+    init_db()
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            "SELECT status, COUNT(*) FROM content_ratings GROUP BY status"
+        ).fetchall()
+
+    counts = {"sfw": 0, "nsfw": 0, "unknown": 0, **dict(rows)}
+    counts["unrated"] = len(list_unrated_games())
+    return counts
+
+
+def list_unknown_rated_games() -> list[dict]:
+    """Visible games Steam returned no content data for, for admin review."""
+    init_db()
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT g.app_id, g.name
+            FROM content_ratings r
+            JOIN games g ON g.app_id = r.app_id
+            WHERE r.status = 'unknown'
+              AND EXISTS (SELECT 1 FROM user_games ug WHERE ug.app_id = g.app_id)
+            ORDER BY g.name COLLATE NOCASE
+            """
+        ).fetchall()
+
+    return [{"appid": row[0], "name": row[1]} for row in rows]
 
 
 def list_all_events() -> list[dict]:

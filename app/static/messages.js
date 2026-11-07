@@ -11,6 +11,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const me = list.dataset.me;
     const other = list.dataset.other;
+    // Group chats pass their own URLs; direct chats use the other person's ID.
+    const isGroup = list.dataset.group === "true";
+    const sendUrl = list.dataset.sendUrl || `/messages/${other}`;
+    const pollUrl = list.dataset.pollUrl || `/api/messages/${other}`;
     let lastId = Number(list.dataset.lastId) || 0;
 
     const POLL_INTERVAL_MS = 4000;
@@ -42,11 +46,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
         document.getElementById("chat-empty")?.remove();
 
+        // Group notices like "Alice added Bob".
+        if (message.kind && message.kind !== "message") {
+            const notice = document.createElement("p");
+            notice.className = "chat-notice";
+            notice.dataset.messageId = message.message_id;
+            notice.textContent = message.text || "";
+            list.append(notice);
+            lastId = Math.max(lastId, message.message_id);
+            return;
+        }
+
+        const fromMe = message.sender_steam_id === me;
         const wrapper = document.createElement("div");
-        wrapper.className =
-            "chat-message " +
-            (message.sender_steam_id === me ? "from-me" : "from-them");
+        wrapper.className = "chat-message " + (fromMe ? "from-me" : "from-them");
         wrapper.dataset.messageId = message.message_id;
+
+        if (isGroup && !fromMe) {
+            const sender = document.createElement("span");
+            sender.className = "chat-sender";
+            sender.textContent = message.sender_name || "";
+            wrapper.append(sender);
+        }
 
         // textContent (not innerHTML) so message text can't inject HTML.
         const body = document.createElement("p");
@@ -89,7 +110,7 @@ document.addEventListener("DOMContentLoaded", () => {
         errorText.textContent = "";
 
         try {
-            const response = await fetch(`/messages/${other}`, {
+            const response = await fetch(sendUrl, {
                 method: "POST",
                 body: new URLSearchParams({ body: text }),
                 headers: { "Accept": "application/json" },
@@ -127,7 +148,7 @@ document.addEventListener("DOMContentLoaded", () => {
     async function poll() {
         try {
             const response = await fetch(
-                `/api/messages/${other}?after=${lastId}`,
+                `${pollUrl}?after=${lastId}`,
                 { headers: { "Accept": "application/json" } }
             );
 

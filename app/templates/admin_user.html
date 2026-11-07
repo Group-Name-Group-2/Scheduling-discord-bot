@@ -33,6 +33,67 @@
             </div>
         {% endif %}
 
+        <section class="settings-card" aria-labelledby="profile-heading">
+            <div class="settings-card-header">
+                <h2 id="profile-heading">Profile</h2>
+                <p class="muted-text">
+                    Replaces {{ person.name }}'s Steam name and picture everywhere on Game Night.
+                    Their Steam account isn't changed.
+                </p>
+            </div>
+
+            <form method="post" action="/admin/users/{{ user_id }}/name" class="settings-form">
+                <label for="name-input">Display name</label>
+                <div class="settings-input-row">
+                    <input
+                        id="name-input"
+                        type="text"
+                        name="display_name"
+                        value="{{ person.name }}"
+                        maxlength="{{ max_name_length }}"
+                        required
+                    >
+                    <button type="submit">Save name</button>
+                </div>
+            </form>
+            {% if override.display_name %}
+                <form method="post" action="/admin/users/{{ user_id }}/name" class="admin-reset-form">
+                    <span class="badge badge-pending">Custom name</span>
+                    <input type="hidden" name="action" value="reset">
+                    <button type="submit" class="button button-ghost button-small">Use Steam name</button>
+                </form>
+            {% endif %}
+
+            <form method="post" action="/admin/users/{{ user_id }}/avatar" enctype="multipart/form-data" class="settings-form">
+                <label for="avatar-input">Profile picture</label>
+                <div class="admin-avatar-row">
+                    {% if person.avatar %}
+                        <img class="admin-avatar-preview" src="{{ person.avatar }}" alt="Current picture" width="64" height="64">
+                    {% else %}
+                        <span class="admin-avatar-preview admin-avatar-empty" aria-hidden="true">{{ person.name[:1] | upper }}</span>
+                    {% endif %}
+                    <div class="settings-input-row">
+                        <input
+                            id="avatar-input"
+                            type="file"
+                            name="avatar"
+                            accept="image/png,image/jpeg,image/gif,image/webp"
+                            required
+                        >
+                        <button type="submit">Upload</button>
+                    </div>
+                </div>
+                <p class="muted-text settings-help">PNG, JPEG, GIF or WebP, up to 2 MB. Square images look best.</p>
+            </form>
+            {% if override.avatar_path %}
+                <form method="post" action="/admin/users/{{ user_id }}/avatar" class="admin-reset-form">
+                    <span class="badge badge-pending">Custom picture</span>
+                    <input type="hidden" name="action" value="reset">
+                    <button type="submit" class="button button-ghost button-small">Use Steam avatar</button>
+                </form>
+            {% endif %}
+        </section>
+
         <section class="settings-card" aria-labelledby="email-heading">
             <div class="settings-card-header">
                 <h2 id="email-heading">Email address</h2>

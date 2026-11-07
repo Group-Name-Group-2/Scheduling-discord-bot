@@ -6,9 +6,10 @@ from fastapi import HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from database import save_owned_games, get_saved_games, save_friends, get_saved_friends, get_shared_games
+from database import save_owned_games, get_saved_games, save_friends, get_saved_friends, get_shared_games, mark_signed_in
 from steam_api import get_owned_games, get_friends_list, get_player_summaries
-from library_service import sync_friend_library
+from library_service import library_is_recent, sync_friend_library
+from content_filter import start_check as start_content_check
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
@@ -99,10 +100,15 @@ async def steam_callback(request: Request):
             detail="Invalid Steam ID."
         )
 
-    # Retrieve the user's Steam library.
+    # Retrieve the user's Steam library, unless it was downloaded recently
+    # (then just record the sign-in).
     try:
-        steam_games = get_owned_games(steam_id)
-        save_owned_games(steam_id, steam_games)
+        if library_is_recent(steam_id):
+            mark_signed_in(steam_id)
+        else:
+            steam_games = get_owned_games(steam_id)
+            save_owned_games(steam_id, steam_games)
+            start_content_check()  # rate any new games in the background
     except requests.RequestException as error:
         raise HTTPException(
             status_code=502,
