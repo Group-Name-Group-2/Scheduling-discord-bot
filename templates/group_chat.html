@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} | Messages | Game Night</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    {% include "navbar.html" %}
+
+    <main class="container chat-container">
+        <div class="chat-header">
+            <a href="/messages" class="chat-back" aria-label="Back to messages">&larr;</a>
+
+            <span class="group-avatar" aria-hidden="true">
+                {% for member in members if member.steamid != steam_id and member.avatar %}
+                    {% if loop.index <= 2 %}<img src="{{ member.avatar }}" alt="" width="32" height="32">{% endif %}
+                {% else %}
+                    <span class="group-avatar-icon">{{ members | length }}</span>
+                {% endfor %}
+            </span>
+
+            <div class="group-header-text">
+                <h1>{{ title }}</h1>
+                <span class="muted-text">{{ members | length }} people</span>
+            </div>
+        </div>
+
+        {% if status_message %}
+            <div class="notice {% if status_is_error %}notice-error{% else %}notice-success{% endif %}" role="status">
+                {{ status_message }}
+            </div>
+        {% endif %}
+
+        <details class="group-details">
+            <summary>Members &amp; settings</summary>
+
+            <ul class="group-member-list">
+                {% for member in members %}
+                    <li>
+                        {% if member.avatar %}
+                            <img src="{{ member.avatar }}" alt="" width="32" height="32" loading="lazy">
+                        {% endif %}
+                        <span>{{ member.name }}{% if member.steamid == steam_id %} <span class="muted-text">(you)</span>{% endif %}</span>
+                    </li>
+                {% endfor %}
+            </ul>
+
+            {% if addable and room_left > 0 %}
+                <form method="post" action="/messages/groups/{{ group.group_id }}/members" class="group-settings-form">
+                    <label id="add-label">Add friends</label>
+                    <div class="event-participants group-add-list" role="group" aria-labelledby="add-label">
+                        {% for friend in addable %}
+                            <label class="event-participant">
+                                <input type="checkbox" name="member_ids" value="{{ friend.steamid }}">
+                                {% if friend.avatar %}
+                                    <img src="{{ friend.avatar }}" alt="" class="event-participant-avatar" loading="lazy">
+                                {% endif %}
+                                <span>{{ friend.name }}</span>
+                            </label>
+                        {% endfor %}
+                    </div>
+                    <button type="submit" class="button-small">Add to group</button>
+                </form>
+            {% endif %}
+
+            <form method="post" action="/messages/groups/{{ group.group_id }}/rename" class="group-settings-form">
+                <label for="group-name">Group name</label>
+                <div class="settings-input-row">
+                    <input
+                        id="group-name"
+                        type="text"
+                        name="name"
+                        value="{{ group.name or '' }}"
+                        maxlength="{{ max_name_length }}"
+                        placeholder="No name (shows members)"
+                    >
+                    <button type="submit" class="button-small">Save</button>
+                </div>
+            </form>
+
+            <form method="post" action="/messages/groups/{{ group.group_id }}/leave"
+                  onsubmit="return confirm('Leave this group? You won\'t see its messages unless someone adds you back.');">
+                <button type="submit" class="button button-danger button-small">Leave group</button>
+            </form>
+        </details>
+
+        <div
+            id="chat-messages"
+            class="chat-messages"
+            aria-live="polite"
+            data-me="{{ steam_id }}"
+            data-group="true"
+            data-send-url="/messages/groups/{{ group.group_id }}"
+            data-poll-url="/api/groups/{{ group.group_id }}/messages"
+            data-last-id="{{ last_message_id }}"
+        >
+            {% for message in messages %}
+                {% if message.kind == "message" %}
+                    <div
+                        class="chat-message {% if message.sender_steam_id == steam_id %}from-me{% else %}from-them{% endif %}"
+                        data-message-id="{{ message.message_id }}"
+                    >
+                        {% if message.sender_steam_id != steam_id %}
+                            <span class="chat-sender">{{ message.sender_name }}</span>
+                        {% endif %}
+                        <p class="chat-body">{{ message.body }}</p>
+                        <time class="chat-time" datetime="{{ message.created_at }}"></time>
+                    </div>
+                {% else %}
+                    <p class="chat-notice" data-message-id="{{ message.message_id }}">{{ message.text }}</p>
+                {% endif %}
+            {% endfor %}
+        </div>
+
+        <form id="chat-form" class="chat-form">
+            <label for="chat-input" class="visually-hidden">Message</label>
+            <textarea
+                id="chat-input"
+                name="body"
+                rows="2"
+                maxlength="{{ max_length }}"
+                placeholder="Message {{ title }}..."
+                required
+            ></textarea>
+            <button type="submit" id="chat-send">Send</button>
+        </form>
+
+        <p id="chat-error" class="chat-error" role="alert"></p>
+    </main>
+
+    {% include "footer.html" %}
+
+    <script src="{{ url_for('static', path='messages.js') }}"></script>
+</body>
+</html>

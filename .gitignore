@@ -90,3 +90,11 @@ Desktop.ini
 
 # Linux
 *~
+# Profile pictures uploaded through the admin dashboard
+static/avatars/
+
+# Test-account pictures made by dev_seed.py
+static/test-avatars/
+
+# Local database: holds every user's data, never commit it
+gamenight.db

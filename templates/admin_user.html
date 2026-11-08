@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ person.name }} | Admin | Game Night</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    {% include "navbar.html" %}
+
+    <main class="container settings-container">
+        <a class="admin-back" href="/admin">&larr; Back to Admin</a>
+
+        <div class="admin-person admin-person-large">
+            {% if person.avatar %}
+                <img src="{{ person.avatar }}" alt="" width="56" height="56">
+            {% endif %}
+            <div>
+                <h1>
+                    {{ person.name }}
+                    {% if override.display_name %}<span class="badge badge-pending">Custom name</span>{% endif %}
+                    {% if is_test %}<span class="badge badge-test">Test account</span>{% endif %}
+                </h1>
+                {% if is_test %}
+                    <p class="muted-text">Test account made by dev_seed.py. It isn't on Steam, so its name, picture and games are stored here, and it's friends with every user.</p>
+                {% else %}
+                    <p class="muted-text">Steam name: {{ steam_name or "Couldn't load from Steam" }}</p>
+                {% endif %}
+                <p class="muted-text">Steam ID: {{ user_id }}</p>
+            </div>
+        </div>
+
+        {% if status_message %}
+            <div class="notice {% if status_is_error %}notice-error{% else %}notice-success{% endif %}" role="status">
+                {{ status_message }}
+            </div>
+        {% endif %}
+
+        <section class="settings-card" aria-labelledby="profile-heading">
+            <div class="settings-card-header">
+                <h2 id="profile-heading">Profile</h2>
+                <p class="muted-text">
+                    Replaces {{ person.name }}'s Steam name and picture everywhere on Game Night.
+                    Their Steam account isn't changed.
+                </p>
+            </div>
+
+            <form method="post" action="/admin/users/{{ user_id }}/name" class="settings-form">
+                <label for="name-input">Display name</label>
+                <div class="settings-input-row">
+                    <input
+                        id="name-input"
+                        type="text"
+                        name="display_name"
+                        value="{{ person.name }}"
+                        maxlength="{{ max_name_length }}"
+                        required
+                    >
+                    <button type="submit">Save name</button>
+                </div>
+            </form>
+            {% if override.display_name %}
+                <form method="post" action="/admin/users/{{ user_id }}/name" class="admin-reset-form">
+                    <span class="badge badge-pending">Custom name</span>
+                    <input type="hidden" name="action" value="reset">
+                    <button type="submit" class="button button-ghost button-small">Use Steam name</button>
+                </form>
+            {% endif %}
+
+            <form method="post" action="/admin/users/{{ user_id }}/avatar" enctype="multipart/form-data" class="settings-form">
+                <label for="avatar-input">Profile picture</label>
+                <div class="admin-avatar-row">
+                    {% if person.avatar %}
+                        <img class="admin-avatar-preview" src="{{ person.avatar }}" alt="Current picture" width="64" height="64">
+                    {% else %}
+                        <span class="admin-avatar-preview admin-avatar-empty" aria-hidden="true">{{ person.name[:1] | upper }}</span>
+                    {% endif %}
+                    <div class="settings-input-row">
+                        <input
+                            id="avatar-input"
+                            type="file"
+                            name="avatar"
+                            accept="image/png,image/jpeg,image/gif,image/webp"
+                            required
+                        >
+                        <button type="submit">Upload</button>
+                    </div>
+                </div>
+                <p class="muted-text settings-help">PNG, JPEG, GIF or WebP, up to 2 MB. Square images look best.</p>
+            </form>
+            {% if override.avatar_path %}
+                <form method="post" action="/admin/users/{{ user_id }}/avatar" class="admin-reset-form">
+                    <span class="badge badge-pending">Custom picture</span>
+                    <input type="hidden" name="action" value="reset">
+                    <button type="submit" class="button button-ghost button-small">Use Steam avatar</button>
+                </form>
+            {% endif %}
+        </section>
+
+        <section class="settings-card" aria-labelledby="email-heading">
+            <div class="settings-card-header">
+                <h2 id="email-heading">Email address</h2>
+                <p class="muted-text">
+                    Saving here sets the address straight away, without a verification email.
+                </p>
+            </div>
+
+            <div class="settings-row">
+                <div>
+                    {% if settings.email %}
+                        <p class="settings-value">{{ settings.email }}</p>
+                        <span class="badge badge-success">Active</span>
+                    {% else %}
+                        <p class="settings-value muted-text">No email address</p>
+                    {% endif %}
+                    {% if settings.pending_email %}
+                        <p class="muted-text settings-help">
+                            Waiting for them to verify: {{ settings.pending_email }}
+                        </p>
+                    {% endif %}
+                </div>
+
+                {% if settings.email %}
+                    <form method="post" action="/admin/users/{{ user_id }}/email">
+                        <input type="hidden" name="action" value="remove">
+                        <button type="submit" class="button button-ghost button-small">Remove</button>
+                    </form>
+                {% endif %}
+            </div>
+
+            <form method="post" action="/admin/users/{{ user_id }}/email" class="settings-form">
+                <label for="email-input">{% if settings.email %}Change email address{% else %}Set email address{% endif %}</label>
+                <div class="settings-input-row">
+                    <input
+                        id="email-input"
+                        type="email"
+                        name="email"
+                        value="{{ settings.email or settings.pending_email or '' }}"
+                        placeholder="name@example.com"
+                        maxlength="254"
+                        required
+                    >
+                    <button type="submit">Save email</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="settings-card" aria-labelledby="schedule-heading">
+            <div class="settings-card-header">
+                <h2 id="schedule-heading">Weekend schedule</h2>
+                <p class="muted-text">View and change the hours {{ person.name }} is free on upcoming weekends.</p>
+            </div>
+            <a class="button" href="/availability?user={{ user_id }}">Edit schedule</a>
+        </section>
+    </main>
+
+    {% include "footer.html" %}
+</body>
+</html>

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Availability | Game Night</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', path='style.css') }}"
+    >
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="{{ url_for('static', path='availability.js') }}" defer></script>
+</head>
+
+<body>
+    {% include "navbar.html" %}
+
+    <main class="container availability-container">
+        {% if editing_user %}
+            <a class="admin-back" href="/admin/users/{{ editing_user }}">&larr; Back to {{ editing_name }}</a>
+            <h1>{{ editing_name }}'s availability</h1>
+            <div class="notice notice-admin" role="status">
+                <span class="navbar-admin-badge">Admin</span>
+                You're editing {{ editing_name }}'s schedule. Changes are saved to their account.
+            </div>
+        {% else %}
+            <h1>Weekend availability</h1>
+            <p class="page-subtitle">
+                Mark the hours you're free to play. When someone plans a game night
+                with you, Game Night uses this to suggest a time that works for everyone.
+            </p>
+        {% endif %}
+
+        <div class="weekend-tabs" role="tablist" aria-label="Choose a weekend" id="weekend-tabs">
+            {% for weekend in weekends %}
+                <button
+                    type="button"
+                    role="tab"
+                    class="weekend-tab"
+                    id="tab-{{ weekend.id }}"
+                    data-weekend="{{ weekend.id }}"
+                    aria-selected="{{ 'true' if loop.first else 'false' }}"
+                >
+                    <span class="weekend-tab-label">{{ weekend.label }}</span>
+                    <span class="weekend-tab-count" data-count-for="{{ weekend.id }}"></span>
+                </button>
+            {% endfor %}
+        </div>
+
+        <section class="availability-panel" aria-live="polite">
+            <div class="availability-toolbar">
+                <span class="muted-text availability-hint">
+                    Click or drag across hours to mark when you're free.
+                </span>
+
+                <div class="availability-presets">
+                    <button type="button" class="button button-ghost button-small" data-preset="afternoon">Afternoons</button>
+                    <button type="button" class="button button-ghost button-small" data-preset="evening">Evenings</button>
+                    <button type="button" class="button button-ghost button-small" data-preset="all">All day</button>
+                    <button type="button" class="button button-ghost button-small" data-preset="clear">Clear</button>
+                </div>
+            </div>
+
+            <div class="availability-grid" id="availability-grid" role="grid" aria-label="Weekend hours" data-user="{{ editing_user or '' }}">
+                <div class="availability-corner" aria-hidden="true"></div>
+                <div class="availability-day-heading" id="day-0-heading"></div>
+                <div class="availability-day-heading" id="day-1-heading"></div>
+
+                {% for hour in hours %}
+                    <div class="availability-hour-label" aria-hidden="true">
+                        {{ "%02d:00" | format(hour) }}
+                    </div>
+                    {% for day in [0, 1] %}
+                        <button
+                            type="button"
+                            class="availability-cell"
+                            data-day="{{ day }}"
+                            data-hour="{{ hour }}"
+                            aria-pressed="false"
+                            aria-label="{{ '%02d:00' | format(hour) }} to {{ '%02d:00' | format((hour + 1) % 24) }}"
+                        ></button>
+                    {% endfor %}
+                {% endfor %}
+            </div>
+
+            <div class="availability-footer">
+                <p class="muted-text" id="availability-summary"></p>
+
+                <div class="availability-actions">
+                    <span id="availability-status" class="availability-status" role="status"></span>
+                    <button type="button" id="availability-save" disabled>Save availability</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    {% include "footer.html" %}
+
+    <script type="application/json" id="availability-data">{{ weekends | tojson }}</script>
+</body>
+</html>

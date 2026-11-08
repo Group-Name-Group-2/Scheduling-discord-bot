@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Find games you and your Steam friends all own, and schedule game nights together.">
+
+    <title>Game Night: Plan game nights with your Steam friends</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', path='style.css') }}"
+    >
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    {% include "navbar.html" %}
+
+    {% set signed_in = request.session.get("steam_id") %}
+
+    <main>
+        <section class="hero">
+            <div class="hero-inner">
+                <p class="eyebrow">For Steam friend groups</p>
+
+                <h1>
+                    Stop asking <span class="accent">“what should we play?”</span>
+                </h1>
+
+                <p class="hero-lead">
+                    Game Night compares your Steam libraries, finds the games
+                    everyone already owns, and puts the next session on the calendar.
+                </p>
+
+                <div class="hero-actions">
+                    {% if signed_in %}
+                        <a class="button button-large" href="/shared-games">Find shared games</a>
+                        <a class="button button-large button-ghost" href="/events">View calendar</a>
+                    {% else %}
+                        <a class="button button-large" href="/auth/steam" id="connect-steam">
+                            Sign in with Steam
+                        </a>
+                        <a class="button button-large button-ghost" href="#how-it-works">How it works</a>
+                    {% endif %}
+                </div>
+
+                {% if not signed_in %}
+                    <p class="hero-note">
+                        Free to use. We only read your public Steam profile; your password never touches this site.
+                    </p>
+                {% endif %}
+            </div>
+        </section>
+
+        <section class="container features" aria-labelledby="features-heading">
+            <h2 id="features-heading" class="section-heading">Everything your group needs</h2>
+
+            <div class="feature-grid">
+                <article class="feature-card">
+                    <div class="feature-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h10"/></svg>
+                    </div>
+                    <h3>Your library, organized</h3>
+                    <p>See every game you own with playtime, cover art and store details in one place.</p>
+                </article>
+
+                <article class="feature-card">
+                    <div class="feature-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="12" r="5"/><circle cx="15" cy="12" r="5"/></g></svg>
+                    </div>
+                    <h3>Shared games, instantly</h3>
+                    <p>Pick a few friends and get the list of games every one of you can launch tonight.</p>
+                </article>
+
+                <article class="feature-card">
+                    <div class="feature-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></g></svg>
+                    </div>
+                    <h3>Scheduled game nights</h3>
+                    <p>Create an event, invite friends, and keep upcoming sessions on a shared calendar.</p>
+                </article>
+
+                <article class="feature-card">
+                    <div class="feature-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M4 5h16v11H9l-5 4V5Z"/></svg>
+                    </div>
+                    <h3>Built-in messages</h3>
+                    <p>Chat with friends to settle on a time without leaving the app.</p>
+                </article>
+            </div>
+        </section>
+
+        <section class="container how-it-works" id="how-it-works" aria-labelledby="how-heading">
+            <h2 id="how-heading" class="section-heading">How it works</h2>
+
+            <ol class="steps">
+                <li>
+                    <span class="step-number">1</span>
+                    <h3>Sign in with Steam</h3>
+                    <p>Log in through Steam's official page. We import your library and friends list.</p>
+                </li>
+                <li>
+                    <span class="step-number">2</span>
+                    <h3>Compare libraries</h3>
+                    <p>Choose who's playing and we'll show the games you all own.</p>
+                </li>
+                <li>
+                    <span class="step-number">3</span>
+                    <h3>Lock in a time</h3>
+                    <p>Create a game night and everyone sees it on their calendar.</p>
+                </li>
+            </ol>
+
+            {% if not signed_in %}
+                <div class="cta-banner">
+                    <div>
+                        <h2>Ready for game night?</h2>
+                        <p>It takes about ten seconds to connect your Steam account.</p>
+                    </div>
+                    <a class="button button-large" href="/auth/steam">Sign in with Steam</a>
+                </div>
+            {% endif %}
+        </section>
+
+        {% if dev_login %}
+            <section class="container" aria-label="Test accounts">
+                <p class="muted-text" style="text-align:center; margin:2rem 0;">
+                    Testing? <a href="/dev/login">Sign in as a test account</a>
+                </p>
+            </section>
+        {% endif %}
+    </main>
+
+    {% include "footer.html" %}
+
+    <script src="{{ url_for('static', path='script.js') }}"></script>
+</body>
+</html>
