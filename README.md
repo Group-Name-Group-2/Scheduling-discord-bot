@@ -30,3 +30,43 @@ uv venv
 uv pip install -r requirements.txt
 uvicorn main:app --reload
 go to 127.0.0.1:8000 in browser
+
+### Test accounts
+Test the site with several users without real Steam accounts.
+
+**Setup**
+
+Make sure `.env` contains `DEV_LOGIN=1`, then restart the server.
+
+**Create test users (PowerShell, from the project folder)**
+```
+.\create-test-users.ps1
+```
+This creates 8 test users with about 14 games each (12 to 16, with 3 that everyone owns), profile pictures, friendships and two weeks of availability. You don't need to activate the venv first. Running it again resets the test users to the same starting data. Test users are also made friends with any real accounts that have signed in with Steam, so run it again after signing in if you want them on your friends list.
+
+Options:
+```
+.\create-test-users.ps1 -Count 10 -Games 20   # 10 users, about 20 games each
+.\create-test-users.ps1 -Remove               # delete all test users and everything they created
+```
+
+If PowerShell says running scripts is disabled, run this once: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
+
+The script runs `dev_seed.py`, which you can also run directly with the venv active:
+```
+python dev_seed.py --count 8 --games 14
+python dev_seed.py --friend <steam id>
+python dev_seed.py --remove
+```
+- `python dev_seed.py` creates 6 test users with about 14 games each and befriends them with every real account on the site.
+- `--count <n>` sets how many test users to create (default 6; the PowerShell script uses 8).
+- `--games <n>` sets about how many games each test user owns, give or take 2 (default 14).
+- `--friend <steam id>` befriends only this real account instead of all of them; repeat it for more, and the account must have signed in once.
+- `--remove` deletes all test users and everything they created (games, friends, pictures, messages, events, availability).
+
+**Sign in as a test user**
+- Open http://127.0.0.1:8000/dev/login and click "Sign in" next to a user. The same page is linked from the bottom of the home page and from the Admin page, where each test user also has a "Sign in as" button.
+- Signing in as a test user signs you out of your own account. Sign in with Steam again to come back.
+- To be signed in as several users at once, use a different browser or a private window for each, or open one at `127.0.0.1:8000` and another at `localhost:8000`.
+
+Test accounts use Steam IDs no real account can have, and the app never asks Steam about them (see `test_accounts.py`). They show a "Test account" badge on the Admin page. Remove `DEV_LOGIN=1` from `.env` before deploying.

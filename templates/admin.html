@@ -36,6 +36,13 @@
         <section class="admin-section" aria-labelledby="users-heading">
             <h2 id="users-heading">Users</h2>
 
+            {% if dev_login %}
+                <p class="muted-text">
+                    <a href="/dev/login">Sign in as a test account</a>.
+                    This signs you out of your own account; sign in with Steam again to come back.
+                </p>
+            {% endif %}
+
             {% if users %}
                 <div class="admin-table-wrap">
                     <table class="admin-table">
@@ -59,6 +66,7 @@
                                             <div>
                                                 <strong>{{ person.name }}</strong>
                                                 {% if user.is_admin %}<span class="navbar-admin-badge">Admin</span>{% endif %}
+                                                {% if user.is_test %}<span class="badge badge-test" title="Fake account from dev_seed.py, not on Steam">Test account</span>{% endif %}
                                                 <div class="admin-sub">{{ user.steam_id }}</div>
                                             </div>
                                         </div>
@@ -80,6 +88,11 @@
                                         <a class="button button-ghost button-small" href="/admin/users/{{ user.steam_id }}">Edit profile</a>
                                         <a class="button button-ghost button-small" href="/admin/users/{{ user.steam_id }}/messages">Messages</a>
                                         <a class="button button-ghost button-small" href="/availability?user={{ user.steam_id }}">Edit schedule</a>
+                                        {% if dev_login and user.is_test %}
+                                            <form method="post" action="/dev/login/{{ user.steam_id }}" style="display:inline">
+                                                <button class="button button-ghost button-small" type="submit" title="Signs you out of your own account">Sign in as</button>
+                                            </form>
+                                        {% endif %}
                                     </td>
                                 </tr>
                             {% endfor %}

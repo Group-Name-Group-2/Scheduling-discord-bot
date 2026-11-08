@@ -85,6 +85,7 @@ from messages_routes import _can_message
 from notifications import notify_group_message, notify_new_message
 from permissions import admin_mode_active
 from steam_api import get_owned_games, get_player_summaries
+from test_accounts import dev_login_enabled, is_test_account
 
 router = APIRouter(prefix="/admin")
 
@@ -209,6 +210,7 @@ def dashboard(request: Request, status: str = "", notice: str = ""):
             "known_games": list_known_games(),
             "people": people,
             "today": today,
+            "dev_login": dev_login_enabled(),
             "status_message": message or notice[:300] or None,
             "status_is_error": is_error,
         },
@@ -249,6 +251,7 @@ def user_page(request: Request, steam_id: str, status: str = ""):
             "steam_name": steam_name,
             "max_name_length": MAX_DISPLAY_NAME_LENGTH,
             "settings": get_user_settings(steam_id),
+            "is_test": is_test_account(steam_id),
             "status_message": message,
             "status_is_error": is_error,
         },

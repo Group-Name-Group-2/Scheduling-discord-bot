@@ -19,10 +19,11 @@ from settings_routes import router as settings_router
 from availability_routes import router as availability_router
 from admin_routes import router as admin_router
 from steam_api import get_game_details, get_player_summaries
+from test_accounts import dev_login_enabled
 
 
 BASE_DIR = Path(__file__).resolve().parent
-load_dotenv(BASE_DIR.parent / ".env")
+load_dotenv(BASE_DIR / ".env")
 
 SESSION_SECRET = os.getenv("SESSION_SECRET")
 
@@ -51,6 +52,11 @@ app.include_router(settings_router)
 app.include_router(availability_router)
 app.include_router(admin_router)
 
+# Test-account sign-in (/dev/login), only with DEV_LOGIN=1 in .env.
+if dev_login_enabled():
+    from dev_routes import router as dev_router
+    app.include_router(dev_router)
+
 app.mount(
     "/static",
     StaticFiles(directory=BASE_DIR / "static"),
@@ -66,6 +72,7 @@ async def home(request: Request):
     return templates.TemplateResponse(
         request=request,
         name="index.html",
+        context={"dev_login": dev_login_enabled()},
     )
 
 @app.get("/api/games/{app_id}")

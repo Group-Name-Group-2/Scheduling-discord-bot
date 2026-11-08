@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test accounts | Game Night</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', path='style.css') }}"
+    >
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    {% include "navbar.html" %}
+
+    <main class="container settings-container">
+        <div class="settings-card">
+            <h1>Test accounts</h1>
+            <p class="muted-text">
+                Development only. Sign in as a fake user to test with several
+                accounts. Use a different browser or a private window for each
+                account you want signed in at the same time.
+            </p>
+
+            {% if accounts %}
+                {% for account in accounts %}
+                    <form method="post" action="/dev/login/{{ account.steam_id }}"
+                          style="display:flex; align-items:center; justify-content:space-between; gap:1rem; margin:0.75rem 0;">
+                        <span>
+                            <strong>{{ account.name }}</strong>
+                            <span class="muted-text">{{ account.steam_id }}</span>
+                            {% if account.current %}<em>(signed in)</em>{% endif %}
+                        </span>
+                        <button type="submit">Sign in</button>
+                    </form>
+                {% endfor %}
+            {% else %}
+                <p>
+                    No test accounts yet. Create them with
+                    <code>python dev_seed.py --friend &lt;your steam id&gt;</code>
+                    and reload this page.
+                </p>
+            {% endif %}
+        </div>
+    </main>
+
+    {% include "footer.html" %}
+</body>
+</html>

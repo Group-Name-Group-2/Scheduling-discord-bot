@@ -5,6 +5,8 @@ import time
 import requests
 from dotenv import load_dotenv
 
+from test_accounts import is_test_account, TEST_ID_BASE
+
 load_dotenv()
 
 API_KEY = os.getenv("STEAM_API_KEY")
@@ -27,6 +29,11 @@ API_URL = (
 
 
 def get_owned_games(steam_id: str):
+    # Test accounts aren't on Steam; their library is what dev_seed.py saved.
+    if is_test_account(steam_id):
+        from database import get_saved_games
+        return get_saved_games(steam_id)
+
     if not API_KEY:
         raise RuntimeError("STEAM_API_KEY is missing from .env")
 
@@ -52,6 +59,13 @@ def get_owned_games(steam_id: str):
     return result["games"]
 
 def get_friends_list(steam_id: str):
+    # Imported here so steam_api still works without the database.
+    from database import get_saved_friends
+
+    # Test accounts aren't on Steam; their friends are what dev_seed.py saved.
+    if is_test_account(steam_id):
+        return get_saved_friends(steam_id)
+
     if not API_KEY:
         raise RuntimeError("STEAM_API_KEY is missing from .env")
 
@@ -79,7 +93,14 @@ def get_friends_list(steam_id: str):
     if friends_list is None:
         return None
 
-    return friends_list.get("friends", [])
+    # Steam doesn't know about test-account friendships, so keep them, or
+    # saving this list (save_friends) would wipe them out.
+    test_friends = [
+        friend for friend in get_saved_friends(steam_id)
+        if is_test_account(friend["steamid"])
+    ]
+
+    return friends_list.get("friends", []) + test_friends
 
 
 def get_player_summaries(steam_ids: list[str], apply_overrides: bool = True) -> dict:
@@ -97,6 +118,18 @@ def get_player_summaries(steam_ids: list[str], apply_overrides: bool = True) -> 
 
     with _profile_cache_lock:
         for steam_id in dict.fromkeys(steam_ids):
+            # Test accounts aren't on Steam. Their name comes from the
+            # display_name override that dev_seed.py sets (applied below).
+            if is_test_account(steam_id):
+                profiles[steam_id] = {
+                    "steamid": steam_id,
+                    "personaname": f"Test user {int(steam_id) - TEST_ID_BASE}",
+                    "avatarfull": "",
+                    "avatarmedium": "",
+                    "profileurl": "",
+                }
+                continue
+
             cached = _profile_cache.get(steam_id)
 
             if cached and now - cached[0] < PROFILE_CACHE_SECONDS:

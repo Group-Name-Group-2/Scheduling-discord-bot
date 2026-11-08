@@ -25,8 +25,13 @@
                 <h1>
                     {{ person.name }}
                     {% if override.display_name %}<span class="badge badge-pending">Custom name</span>{% endif %}
+                    {% if is_test %}<span class="badge badge-test">Test account</span>{% endif %}
                 </h1>
-                <p class="muted-text">Steam name: {{ steam_name or "Couldn't load from Steam" }}</p>
+                {% if is_test %}
+                    <p class="muted-text">Test account made by dev_seed.py. It isn't on Steam, so its name, games and friends are stored here.</p>
+                {% else %}
+                    <p class="muted-text">Steam name: {{ steam_name or "Couldn't load from Steam" }}</p>
+                {% endif %}
                 <p class="muted-text">Steam ID: {{ user_id }}</p>
             </div>
         </div>

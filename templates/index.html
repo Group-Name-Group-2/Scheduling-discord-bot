@@ -123,6 +123,14 @@
                 </div>
             {% endif %}
         </section>
+
+        {% if dev_login %}
+            <section class="container" aria-label="Test accounts">
+                <p class="muted-text" style="text-align:center; margin:2rem 0;">
+                    Testing? <a href="/dev/login">Sign in as a test account</a>
+                </p>
+            </section>
+        {% endif %}
     </main>
 
     {% include "footer.html" %}

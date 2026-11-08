@@ -1807,6 +1807,11 @@ body:has(.chat-container) .site-footer {
     background-color: rgb(245 198 107 / 14%);
 }
 
+.badge-test {
+    color: #c4a7ff;
+    background-color: rgb(196 167 255 / 14%);
+}
+
 .notice {
     margin-bottom: 20px;
     padding: 12px 16px;
