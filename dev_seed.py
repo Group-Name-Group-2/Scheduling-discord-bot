@@ -1,14 +1,17 @@
 """
 Create (or reset) fake test accounts so you can test with several users.
 
-    python dev_seed.py                  # 6 test users, friends with every real user
+    python dev_seed.py                  # 6 test users
     python dev_seed.py --count 10       # more test users
     python dev_seed.py --games 20       # about 20 games each (default 14)
-    python dev_seed.py --friend 7656... # only befriend this real account (repeatable)
     python dev_seed.py --remove         # delete all test accounts and their data
 
+Test accounts are always friends with every user, including ones who sign
+up later; that's built into the app (database.get_saved_friends), not
+stored by this script.
+
 Safe to run again: it resets the test users' names, profile pictures,
-libraries, friends and availability to the same starting data. Then set DEV_LOGIN=1 in .env,
+libraries and availability to the same starting data. Then set DEV_LOGIN=1 in .env,
 restart the server and go to http://127.0.0.1:8000/dev/login.
 
 Test accounts use Steam IDs no real account can have, and the app never
@@ -17,7 +20,7 @@ asks Steam about them (see test_accounts.py).
 
 import argparse
 import random
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 
 from database import (
@@ -25,15 +28,15 @@ from database import (
     admin_set_display_name,
     get_connection,
     init_db,
-    list_users,
-    save_friends,
     save_owned_games,
 )
-from test_accounts import TEST_ID_BASE, TEST_ID_LIMIT, is_test_account, test_steam_id
+from availability_routes import upcoming_weekends
+from recommender import EARLIEST_HOUR, LATEST_END_HOUR
+from test_accounts import TEST_ID_LIMIT, is_test_account, test_id_sql, test_steam_id
 
 NAMES = [
-    "Test Alice", "Test Bob", "Test Carmen", "Test Dev", "Test Ellie",
-    "Test Finn", "Test Grace", "Test Hiro", "Test Ivy", "Test Jonah",
+    "Alice", "Bob", "Carmen", "Dev", "Ellie",
+    "Finn", "Grace", "Hiro", "Ivy", "Jonah",
 ]
 
 # Real Steam app IDs, so names and cover images load like normal games.
@@ -79,7 +82,6 @@ GAMES = [
 # Everyone owns these, so every pair of test users has shared games.
 COMMON_GAMES = 3
 DEFAULT_GAMES_PER_USER = 14
-AVAILABILITY_DAYS = 14
 
 # Profile pictures: a coloured circle with the user's initial, written as
 # SVG files the site serves from /static/test-avatars/.
@@ -93,7 +95,7 @@ AVATAR_COLORS = [
 
 def write_avatar(steam_id: str, name: str, color: str) -> str:
     """Write a picture for this test user and return its URL."""
-    initial = (name.removeprefix("Test ").strip()[:1] or "?").upper()
+    initial = (name.strip()[:1] or "?").upper()
     svg = (
         '<svg xmlns="http://www.w3.org/2000/svg" width="184" height="184" viewBox="0 0 184 184">'
         f'<rect width="184" height="184" fill="{color}"/>'
@@ -106,16 +108,8 @@ def write_avatar(steam_id: str, name: str, color: str) -> str:
     return f"{AVATAR_URL}/{steam_id}.svg"
 
 
-def _test_id_clause(column: str) -> str:
-    """SQL matching test-account IDs in `column`."""
-    return (
-        f"(length({column}) = 17 AND CAST({column} AS INTEGER) "
-        f"BETWEEN {TEST_ID_BASE + 1} AND {TEST_ID_BASE + TEST_ID_LIMIT})"
-    )
-
-
 def remove_test_accounts() -> None:
-    t = _test_id_clause
+    t = test_id_sql
     with get_connection() as connection:
         connection.execute(f"DELETE FROM event_participants WHERE {t('participant_steam_id')}")
         connection.execute(f"DELETE FROM game_night_events WHERE {t('creator_steam_id')}")
@@ -133,7 +127,7 @@ def remove_test_accounts() -> None:
             picture.unlink()
 
 
-def seed(count: int, real_friend_ids: list[str], games_per_user: int = DEFAULT_GAMES_PER_USER) -> list[str]:
+def seed(count: int, games_per_user: int = DEFAULT_GAMES_PER_USER) -> list[str]:
     rng = random.Random(42)  # same data every run
     test_ids = [test_steam_id(n) for n in range(1, count + 1)]
 
@@ -151,39 +145,33 @@ def seed(count: int, real_friend_ids: list[str], games_per_user: int = DEFAULT_G
             connection.execute(f"DELETE FROM user_games WHERE steam_id = ?", (steam_id,))
         save_owned_games(steam_id, games)
 
-        name = NAMES[number - 1] if number <= len(NAMES) else f"Test User {number}"
+        name = NAMES[number - 1] if number <= len(NAMES) else f"User {number}"
         admin_set_display_name(steam_id, name)
         admin_set_avatar(steam_id, write_avatar(steam_id, name, AVATAR_COLORS[(number - 1) % len(AVATAR_COLORS)]))
 
-        # Friends with every other test user and the chosen real accounts.
-        friends = [fid for fid in test_ids + real_friend_ids if fid != steam_id]
-        save_friends(steam_id, [{"steamid": fid} for fid in friends])
-
     with get_connection() as connection:
-        # Real accounts: add the test users without touching their Steam friends.
-        connection.executemany(
-            """
-            INSERT OR IGNORE INTO steam_friends (steam_id, friend_steam_id, relationship)
-            VALUES (?, ?, 'friend')
-            """,
-            [(real_id, test_id) for real_id in real_friend_ids for test_id in test_ids],
+        # Friendships stored by older versions of this script; the app now
+        # makes test accounts friends with everyone without storing it.
+        connection.execute(
+            f"DELETE FROM steam_friends WHERE {test_id_sql('steam_id')} "
+            f"OR {test_id_sql('friend_steam_id')}"
         )
 
-        # Evening availability for the next two weeks, so scheduling and
+        # Weekend availability for every weekend the Availability page
+        # shows (it only has Saturdays and Sundays), so scheduling and
         # recommended times have something to work with.
-        today = date.today()
+        days = [day for weekend in upcoming_weekends(date.today()) for day in weekend]
         connection.execute(
-            f"DELETE FROM availability WHERE {_test_id_clause('steam_id')}"
+            f"DELETE FROM availability WHERE {test_id_sql('steam_id')}"
         )
         slots = []
         for steam_id in test_ids:
-            for offset in range(AVAILABILITY_DAYS):
-                if rng.random() < 0.35:
+            for day in days:
+                if rng.random() < 0.3:
                     continue  # busy that day
-                day = (today + timedelta(days=offset)).isoformat()
-                start = rng.randint(16, 20)
-                for hour in range(start, min(24, start + rng.randint(2, 5))):
-                    slots.append((steam_id, day, hour))
+                start = rng.randint(max(EARLIEST_HOUR, 10), 20)
+                for hour in range(start, min(LATEST_END_HOUR, start + rng.randint(2, 6))):
+                    slots.append((steam_id, day.isoformat(), hour))
         connection.executemany(
             "INSERT OR IGNORE INTO availability (steam_id, slot_date, slot_hour) VALUES (?, ?, ?)",
             slots,
@@ -197,8 +185,6 @@ def main() -> None:
     parser.add_argument("--count", type=int, default=6, help="number of test users (default 6)")
     parser.add_argument("--games", type=int, default=DEFAULT_GAMES_PER_USER,
                         help=f"about how many games each user owns, give or take 2 (default {DEFAULT_GAMES_PER_USER})")
-    parser.add_argument("--friend", action="append", default=[], metavar="STEAM_ID",
-                        help="real account to befriend (default: every real account that has signed in)")
     parser.add_argument("--remove", action="store_true", help="delete all test accounts and their data")
     args = parser.parse_args()
 
@@ -212,29 +198,13 @@ def main() -> None:
     if not 1 <= args.count <= TEST_ID_LIMIT:
         parser.error(f"--count must be 1-{TEST_ID_LIMIT}")
 
-    real_ids = {u["steam_id"] for u in list_users() if not is_test_account(u["steam_id"])}
-
-    if args.friend:
-        unknown = [fid for fid in args.friend if fid not in real_ids]
-        if unknown:
-            parser.error(
-                "these accounts haven't signed in to the site yet, so they "
-                f"can't be befriended: {', '.join(unknown)}"
-            )
-        real_friend_ids = args.friend
-    else:
-        real_friend_ids = sorted(real_ids)
-
     if not 1 <= args.games <= len(GAMES):
         parser.error(f"--games must be 1-{len(GAMES)}")
 
-    test_ids = seed(args.count, real_friend_ids, args.games)
+    test_ids = seed(args.count, args.games)
 
     print(f"Created {len(test_ids)} test accounts ({test_ids[0]} to {test_ids[-1]}).")
-    if real_friend_ids:
-        print(f"Befriended real accounts: {', '.join(real_friend_ids)}")
-    else:
-        print("No real accounts to befriend yet. Sign in with Steam once, then run this again.")
+    print("They're friends with every user, including anyone who signs up later.")
     print("Set DEV_LOGIN=1 in .env, restart the server, then open http://127.0.0.1:8000/dev/login")
 
 

@@ -28,7 +28,7 @@
                     {% if is_test %}<span class="badge badge-test">Test account</span>{% endif %}
                 </h1>
                 {% if is_test %}
-                    <p class="muted-text">Test account made by dev_seed.py. It isn't on Steam, so its name, games and friends are stored here.</p>
+                    <p class="muted-text">Test account made by dev_seed.py. It isn't on Steam, so its name, picture and games are stored here, and it's friends with every user.</p>
                 {% else %}
                     <p class="muted-text">Steam name: {{ steam_name or "Couldn't load from Steam" }}</p>
                 {% endif %}

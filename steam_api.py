@@ -62,7 +62,8 @@ def get_friends_list(steam_id: str):
     # Imported here so steam_api still works without the database.
     from database import get_saved_friends
 
-    # Test accounts aren't on Steam; their friends are what dev_seed.py saved.
+    # Test accounts aren't on Steam; database.get_saved_friends works out
+    # their friends (everyone who has signed in).
     if is_test_account(steam_id):
         return get_saved_friends(steam_id)
 
@@ -93,8 +94,8 @@ def get_friends_list(steam_id: str):
     if friends_list is None:
         return None
 
-    # Steam doesn't know about test-account friendships, so keep them, or
-    # saving this list (save_friends) would wipe them out.
+    # Steam doesn't know about test accounts, but they're friends with
+    # everyone (see database.get_saved_friends), so add them to the list.
     test_friends = [
         friend for friend in get_saved_friends(steam_id)
         if is_test_account(friend["steamid"])

@@ -68,7 +68,9 @@ def sync_friend_library(friend_steam_id: str) -> dict:
             ),
         }
 
-    save_owned_games(friend_steam_id, games)
+    # mark_synced=False: this friend may never have signed in, and
+    # last_synced is what marks someone as a site user.
+    save_owned_games(friend_steam_id, games, mark_synced=False)
     start_content_check()  # rate any new games in the background
 
     return {

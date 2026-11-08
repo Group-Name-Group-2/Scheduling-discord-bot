@@ -10,6 +10,8 @@ from database import save_owned_games, get_saved_games, save_friends, get_saved_
 from steam_api import get_owned_games, get_friends_list, get_player_summaries
 from library_service import library_is_recent, sync_friend_library, sync_friend_libraries
 from content_filter import start_check as start_content_check
+from test_accounts import is_test_account
+from email_service import app_base_url
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
@@ -20,12 +22,15 @@ STEAM_OPENID_URL = "https://steamcommunity.com/openid/login"
 
 
 @router.get("/auth/steam")
-async def login_with_steam():
+async def login_with_steam(request: Request):
+    # Come back to the address the user is on (or APP_BASE_URL), so the
+    # session cookie lands on the same site, e.g. localhost vs 127.0.0.1.
+    base_url = app_base_url(str(request.base_url))
     params = {
         "openid.ns": "http://specs.openid.net/auth/2.0",
         "openid.mode": "checkid_setup",
-        "openid.return_to": "http://127.0.0.1:8000/auth/steam/callback",
-        "openid.realm": "http://127.0.0.1:8000/",
+        "openid.return_to": f"{base_url}/auth/steam/callback",
+        "openid.realm": f"{base_url}/",
         "openid.identity": "http://specs.openid.net/auth/2.0/identifier_select",
         "openid.claimed_id": "http://specs.openid.net/auth/2.0/identifier_select",
     }
@@ -56,6 +61,17 @@ def steam_callback(request: Request):
         raise HTTPException(
             status_code=400,
             detail="Invalid Steam identity."
+        )
+
+    # The response must be for this site. Steam's check below only proves
+    # it's genuine, so without this a sign-in made on any other "Sign in
+    # through Steam" site could be replayed here to sign in as that person.
+    # Set APP_BASE_URL in production so a forged Host header can't pass this.
+    expected_return_to = f"{app_base_url(str(request.base_url))}/auth/steam/callback"
+    if params.get("openid.return_to", "").split("?")[0] != expected_return_to:
+        raise HTTPException(
+            status_code=400,
+            detail="This Steam login was not made for this site.",
         )
 
     # Ask Steam to verify the complete OpenID response.
@@ -273,11 +289,14 @@ def shared_games_page(request: Request):
         return RedirectResponse(url="/", status_code=303)
 
     # Get the user's saved friends. If none are saved yet (e.g. the
-    # Friends page was never opened), fetch the list from Steam.
+    # Friends page was never opened), fetch the list from Steam. Test
+    # accounts don't count: they're friends with everyone, so they're
+    # always in the list even when nothing has been saved from Steam.
     friends = get_saved_friends(steam_id)
     friends_message = None
+    has_steam_friends = any(not is_test_account(f["steamid"]) for f in friends)
 
-    if not friends:
+    if not has_steam_friends and not is_test_account(steam_id):
         try:
             steam_friends = get_friends_list(steam_id)
         except (requests.RequestException, RuntimeError):

@@ -15,6 +15,8 @@ from database import confirm_pending_email, get_connection, init_db, set_pending
 from email_service import is_valid_email, send_email
 
 TOKEN_EXPIRE_MINUTES = 15
+# Same as the Settings page's resend limit, so this can't spam an inbox.
+RESEND_COOLDOWN_SECONDS = 60
 
 
 def request_magic_link(email: str, base_url: str) -> tuple[bool, str]:
@@ -27,14 +29,22 @@ def request_magic_link(email: str, base_url: str) -> tuple[bool, str]:
     # Look up existing steam_id linked to this email address in user_settings
     with get_connection() as connection:
         row = connection.execute(
-            "SELECT steam_id FROM user_settings WHERE email = ?",
+            "SELECT steam_id, verify_sent_at FROM user_settings WHERE email = ?",
             (email,),
         ).fetchone()
 
     if not row:
         return False, "No registered account found with that email address. Please sign in with Steam first to link your email."
 
-    steam_id = row[0]
+    steam_id, last_sent = row
+
+    if last_sent:
+        try:
+            waited = datetime.now(timezone.utc) - datetime.fromisoformat(last_sent)
+        except ValueError:
+            waited = None
+        if waited is not None and waited < timedelta(seconds=RESEND_COOLDOWN_SECONDS):
+            return False, "A sign-in link was sent less than a minute ago. Please check your inbox or wait a moment."
 
     # Generate a secure random token and store its SHA-256 hash in SQLite
     raw_token = secrets.token_urlsafe(32)
