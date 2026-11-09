@@ -15,7 +15,7 @@ libraries and availability to the same starting data. Then set DEV_LOGIN=1 in .e
 restart the server and go to http://127.0.0.1:8000/dev/login.
 
 Test accounts use Steam IDs no real account can have, and the app never
-asks Steam about them (see test_accounts.py).
+asks Steam about them (see fake_accounts.py).
 """
 
 import argparse
@@ -32,7 +32,7 @@ from database import (
 )
 from availability_routes import upcoming_weekends
 from recommender import EARLIEST_HOUR, LATEST_END_HOUR
-from test_accounts import TEST_ID_LIMIT, is_test_account, test_id_sql, test_steam_id
+from fake_accounts import TEST_ID_LIMIT, is_test_account, test_id_sql, test_steam_id
 
 NAMES = [
     "Alice", "Bob", "Carmen", "Dev", "Ellie",

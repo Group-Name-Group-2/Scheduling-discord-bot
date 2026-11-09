@@ -19,7 +19,7 @@ from settings_routes import router as settings_router
 from availability_routes import router as availability_router
 from admin_routes import router as admin_router
 from steam_api import get_game_details, get_player_summaries
-from test_accounts import dev_login_enabled
+from fake_accounts import dev_login_enabled
 
 
 BASE_DIR = Path(__file__).resolve().parent

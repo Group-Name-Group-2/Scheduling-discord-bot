@@ -5,7 +5,7 @@ import time
 import requests
 from dotenv import load_dotenv
 
-from test_accounts import is_test_account, TEST_ID_BASE
+from fake_accounts import is_test_account, TEST_ID_BASE
 
 load_dotenv()
 

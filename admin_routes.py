@@ -85,7 +85,7 @@ from messages_routes import _can_message
 from notifications import notify_group_message, notify_new_message
 from permissions import admin_mode_active
 from steam_api import get_owned_games, get_player_summaries
-from test_accounts import dev_login_enabled, is_test_account
+from fake_accounts import dev_login_enabled, is_test_account
 
 router = APIRouter(prefix="/admin")
 

@@ -1,0 +1,4 @@
+# Tools for development and testing (not needed to run the site).
+-r requirements.txt
+pytest==9.2.0
+httpx==0.28.1

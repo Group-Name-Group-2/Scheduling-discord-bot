@@ -10,7 +10,7 @@ from database import save_owned_games, get_saved_games, save_friends, get_saved_
 from steam_api import get_owned_games, get_friends_list, get_player_summaries
 from library_service import library_is_recent, sync_friend_library, sync_friend_libraries
 from content_filter import start_check as start_content_check
-from test_accounts import is_test_account
+from fake_accounts import is_test_account
 from email_service import app_base_url
 
 BASE_DIR = Path(__file__).resolve().parent

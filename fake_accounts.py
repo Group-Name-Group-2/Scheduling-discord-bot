@@ -1,4 +1,4 @@
-"""
+r"""
 Fake accounts for testing the site with several users, no real Steam
 accounts needed.
 
