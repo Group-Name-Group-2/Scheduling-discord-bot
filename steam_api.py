@@ -94,14 +94,9 @@ def get_friends_list(steam_id: str):
     if friends_list is None:
         return None
 
-    # Steam doesn't know about test accounts, but they're friends with
-    # everyone (see database.get_saved_friends), so add them to the list.
-    test_friends = [
-        friend for friend in get_saved_friends(steam_id)
-        if is_test_account(friend["steamid"])
-    ]
-
-    return friends_list.get("friends", []) + test_friends
+    # Steam's list only. Test accounts are added by
+    # database.get_saved_friends, the one place that rule lives.
+    return friends_list.get("friends", [])
 
 
 def get_player_summaries(steam_ids: list[str], apply_overrides: bool = True) -> dict:

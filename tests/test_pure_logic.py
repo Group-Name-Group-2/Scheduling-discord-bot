@@ -47,7 +47,14 @@ class TestFakeAccounts:
     def test_sql_condition_matches_python(self, fresh_database):
         import database
 
-        ids = [fake_accounts.test_steam_id(3), "76561198000000001", "123"]
+        test_id = fake_accounts.test_steam_id(3)
+        ids = [
+            test_id, "76561198000000001", "123",
+            # Forms int() would accept, and text that sorts inside the range.
+            " " + test_id[1:], "+" + test_id[1:], test_id + "0",
+            test_id[:7] + "_" + test_id[8:], test_id[:-1] + "a",
+        ]
+        assert [i for i in ids if fake_accounts.is_test_account(i)] == [test_id]
         with database.get_connection() as connection:
             connection.execute("CREATE TABLE t (steam_id TEXT)")
             connection.executemany("INSERT INTO t VALUES (?)", [(i,) for i in ids])

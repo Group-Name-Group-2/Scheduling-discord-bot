@@ -199,6 +199,8 @@ def friends_page(request: Request):
 
         else:
             save_friends(steam_id, friends)
+            # Read back so the list includes test accounts (DEV_LOGIN=1).
+            friends = get_saved_friends(steam_id)
 
     except requests.RequestException:
         error_message = (

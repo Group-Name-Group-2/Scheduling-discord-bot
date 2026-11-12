@@ -3,6 +3,8 @@ import threading
 from pathlib import Path
 from datetime import datetime, timezone
 
+from fake_accounts import dev_login_enabled, is_test_account, test_id_sql
+
 # Store the database in the project root.
 DATABASE_PATH = Path(__file__).resolve().parent / "gamenight.db"
 
@@ -408,7 +410,16 @@ def get_shared_games(steam_ids: list[str]) -> list[dict]:
 
 
 def save_friends(steam_id: str, friends: list):
+    """
+    Replace steam_id's saved friends with the list Steam returned.
+    Test-account friendships are never stored (get_saved_friends works
+    them out), so a test account's list isn't saved and test accounts
+    in `friends` are skipped.
+    """
     init_db()
+
+    if is_test_account(steam_id):
+        return
 
     with get_connection() as connection:
         # Replace the previous list only after Steam
@@ -434,27 +445,58 @@ def save_friends(steam_id: str, friends: list):
                 friend.get("friend_since"),
             )
             for friend in friends
-            if friend.get("steamid")
+            if friend.get("steamid") and not is_test_account(friend["steamid"])
         ])
 
 
 def get_saved_friends(steam_id: str):
+    """
+    steam_id's friends: the list saved from Steam, plus, while DEV_LOGIN=1,
+    the test-account friendships. Test accounts are friends with every
+    other user who has signed in (real or test), and every user is friends
+    with every test account. Nothing about this is stored, so users who
+    sign up later are included automatically. This is the only place the
+    rule lives.
+    """
     with get_connection() as connection:
         rows = connection.execute("""
             SELECT friend_steam_id, relationship, friend_since
             FROM steam_friends
             WHERE steam_id = ?
-            ORDER BY friend_steam_id
         """, (steam_id,)).fetchall()
 
-    return [
-        {
-            "steamid": row[0],
-            "relationship": row[1],
-            "friend_since": row[2],
-        }
-        for row in rows
-    ]
+        friends = [
+            {
+                "steamid": row[0],
+                "relationship": row[1],
+                "friend_since": row[2],
+            }
+            for row in rows
+        ]
+
+        if dev_login_enabled():
+            # last_synced is what marks someone as having signed in; rows
+            # without it are friends whose libraries were only looked up.
+            if is_test_account(steam_id):
+                extra = connection.execute(
+                    "SELECT steam_id FROM steam_users "
+                    "WHERE last_synced IS NOT NULL AND steam_id != ?",
+                    (steam_id,),
+                ).fetchall()
+            else:
+                extra = connection.execute(
+                    f"SELECT steam_id FROM steam_users "
+                    f"WHERE {test_id_sql('steam_id')} AND last_synced IS NOT NULL"
+                ).fetchall()
+
+            known = {friend["steamid"] for friend in friends}
+            friends += [
+                {"steamid": row[0], "relationship": "friend", "friend_since": None}
+                for row in extra
+                if row[0] not in known
+            ]
+
+    return sorted(friends, key=lambda friend: friend["steamid"])
 
 def save_game_night_event(
     creator_steam_id: str,

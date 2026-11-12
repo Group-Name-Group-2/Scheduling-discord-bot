@@ -169,6 +169,80 @@ class TestFriends:
         make_user(ALICE, friends=[BOB])
         assert database.get_saved_friends(BOB) == []
 
+    def test_test_accounts_are_friends_with_everyone(self, make_user, monkeypatch):
+        from fake_accounts import test_steam_id
+        test1, test2 = test_steam_id(1), test_steam_id(2)
+        make_user(ALICE, friends=[BOB])
+        make_user(BOB)
+        make_user(test1)
+        make_user(test2)
+
+        def ids(steam_id):
+            return [f["steamid"] for f in database.get_saved_friends(steam_id)]
+
+        # Off without DEV_LOGIN=1.
+        assert ids(test1) == []
+        assert ids(ALICE) == [BOB]
+
+        monkeypatch.setenv("DEV_LOGIN", "1")
+        assert ids(ALICE) == sorted([BOB, test1, test2])
+        assert ids(BOB) == sorted([test1, test2])
+        assert ids(test1) == sorted([ALICE, BOB, test2])
+
+        # A user who signs up later is included without re-seeding.
+        make_user(CAROL)
+        assert CAROL in ids(test1)
+        assert ids(CAROL) == sorted([test1, test2])
+
+    def test_test_friendships_are_not_stored(self, make_user, monkeypatch):
+        from fake_accounts import test_steam_id
+        make_user(ALICE)
+        make_user(test_steam_id(1))
+        monkeypatch.setenv("DEV_LOGIN", "1")
+        # Steam list + test friends, as the Friends page saves it.
+        database.save_friends(ALICE, database.get_saved_friends(ALICE) + [{"steamid": BOB}])
+        friend_ids = [f["steamid"] for f in database.get_saved_friends(ALICE)]
+        assert friend_ids == sorted([BOB, test_steam_id(1)])   # no duplicates
+        with database.get_connection() as connection:
+            stored = connection.execute("SELECT friend_steam_id FROM steam_friends").fetchall()
+        assert stored == [(BOB,)]
+
+    def test_test_account_list_is_never_saved(self, make_user, monkeypatch):
+        """The Friends page saves the list it shows; for a test account that
+        would store its worked-out friendships with real users."""
+        from fake_accounts import test_steam_id
+        test1 = test_steam_id(1)
+        make_user(ALICE)
+        make_user(test1)
+        monkeypatch.setenv("DEV_LOGIN", "1")
+        database.save_friends(test1, database.get_saved_friends(test1))
+        with database.get_connection() as connection:
+            assert connection.execute("SELECT COUNT(*) FROM steam_friends").fetchone()[0] == 0
+        monkeypatch.setenv("DEV_LOGIN", "0")
+        assert database.get_saved_friends(test1) == []
+
+    def test_only_signed_in_users_are_test_account_friends(self, make_user, monkeypatch):
+        from fake_accounts import test_steam_id
+        test1 = test_steam_id(1)
+        make_user(ALICE)
+        make_user(test1)
+        # BOB's library was looked up, but BOB never signed in.
+        database.save_owned_games(BOB, [], mark_synced=False)
+        monkeypatch.setenv("DEV_LOGIN", "1")
+        assert [f["steamid"] for f in database.get_saved_friends(test1)] == [ALICE]
+
+    def test_stored_test_friendships_survive_dev_login_off(self, make_user):
+        """Rows stored by an older dev_seed.py still show without DEV_LOGIN."""
+        from fake_accounts import test_steam_id
+        test1 = test_steam_id(1)
+        make_user(ALICE)
+        with database.get_connection() as connection:
+            connection.execute(
+                "INSERT INTO steam_friends (steam_id, friend_steam_id) VALUES (?, ?)",
+                (ALICE, test1),
+            )
+        assert [f["steamid"] for f in database.get_saved_friends(ALICE)] == [test1]
+
 
 # ---------------------------------------------------------------------
 # Ignored games and content ratings
