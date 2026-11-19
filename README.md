@@ -29,7 +29,7 @@ uv venv
 .venv\Scripts\Activate.ps1
 uv pip install -r requirements.txt
 uvicorn main:app --reload
-#if windows auth error do 
+#if windows auth error add python -m before uvicorn
 go to 127.0.0.1:8000 in browser
 
 ### Test accounts
