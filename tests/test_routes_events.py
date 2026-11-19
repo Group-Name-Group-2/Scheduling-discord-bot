@@ -106,6 +106,25 @@ class TestCreateEvent:
         assert event["creator_steam_id"] == ALICE
         assert sorted(event["participant_steam_ids"]) == sorted([BOB, CAROL])
 
+    def test_emails_invited_participants(self, client, alice, outbox):
+        database.admin_set_email(BOB, "bob@example.com")
+        database.admin_set_email(CAROL, "carol@example.com")
+        database.set_notify_messages(CAROL, False)
+
+        client.post("/events/create", data=event_form())
+
+        assert [m["To"] for m in outbox] == ["bob@example.com"]
+        assert "Shared Game" in outbox[0]["Subject"]
+        text = outbox[0].get_body(("plain",)).get_content()
+        assert "at 7:00 PM" in text
+        assert "2 hours" in text
+        assert "http://testserver/events" in text
+
+    def test_no_email_when_create_fails(self, client, alice, outbox):
+        database.admin_set_email(BOB, "bob@example.com")
+        client.post("/events/create", data=event_form(date=PAST))
+        assert outbox == []
+
     def test_no_participants_is_fine(self, client, alice):
         form = event_form()
         del form["friend_ids"]

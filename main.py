@@ -3,7 +3,7 @@ import requests
 from pathlib import Path
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import BackgroundTasks, FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -20,6 +20,8 @@ from availability_routes import router as availability_router
 from admin_routes import router as admin_router
 from steam_api import get_game_details, get_player_summaries
 from fake_accounts import dev_login_enabled
+from email_service import app_base_url
+from notifications import notify_event_invite
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -200,7 +202,7 @@ def create_event_page(request: Request):
     )
 
 @app.post("/events/create")
-async def create_event(request: Request):
+async def create_event(request: Request, background_tasks: BackgroundTasks):
     steam_id = request.session.get("steam_id")
 
     if not steam_id:
@@ -312,6 +314,14 @@ async def create_event(request: Request):
             {"error": "Something went wrong while saving the event."},
             status_code=500,
         )
+
+    # Let each participant know they were added (sent after the response).
+    background_tasks.add_task(
+        notify_event_invite,
+        event_id=event_id,
+        recipient_ids=participant_ids,
+        base_url=app_base_url(str(request.base_url)),
+    )
 
     return JSONResponse({
         "success": True,

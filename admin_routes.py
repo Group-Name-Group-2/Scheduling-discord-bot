@@ -75,6 +75,7 @@ from database import (
 )
 import content_filter
 from email_service import app_base_url, is_valid_email
+from notifications import notify_event_invite
 from library_service import (
     LIBRARY_MAX_AGE_SETTING,
     MAX_LIBRARY_MAX_AGE_MINUTES,
@@ -447,7 +448,7 @@ def event_page(request: Request, event_id: int, status: str = "", error: str = "
 
 
 @router.post("/events/{event_id}")
-async def save_event(request: Request, event_id: int):
+async def save_event(request: Request, event_id: int, background_tasks: BackgroundTasks):
     if not admin_mode_active(request):
         return _forbidden()
 
@@ -487,6 +488,16 @@ async def save_event(request: Request, event_id: int):
         return fail("One or more participants are invalid.")
 
     update_event(event_id, app_id, event_date, event_time, duration, chosen)
+
+    # Email only the people this edit added, not everyone already invited.
+    added = [p for p in chosen if p not in event["participant_steam_ids"]]
+    if added:
+        background_tasks.add_task(
+            notify_event_invite,
+            event_id=event_id,
+            recipient_ids=added,
+            base_url=app_base_url(str(request.base_url)),
+        )
 
     return RedirectResponse(url=f"/admin/events/{event_id}?status=event_saved", status_code=303)
 

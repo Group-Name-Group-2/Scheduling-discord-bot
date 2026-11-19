@@ -31,7 +31,7 @@ uv pip install -r requirements.txt
 uvicorn main:app --reload
 #if windows auth error add python -m before uvicorn
 go to 127.0.0.1:8000 in browser
-
+#email features will not work on university wifi
 ### Test accounts
 Test the site with several users without real Steam accounts.
 

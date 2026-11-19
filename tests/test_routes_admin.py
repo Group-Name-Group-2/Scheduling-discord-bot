@@ -225,6 +225,12 @@ class TestEditEvents:
         )
         assert sorted(event["participant_steam_ids"]) == sorted([CAROL, DAVE])
 
+    def test_save_emails_only_newly_added(self, client, event_id, outbox):
+        database.admin_set_email(CAROL, "carol@example.com")
+        database.admin_set_email(DAVE, "dave@example.com")
+        client.post(f"/admin/events/{event_id}", data=self.form())
+        assert [m["To"] for m in outbox] == ["dave@example.com"]
+
     @pytest.mark.parametrize("overrides", [
         {"game_id": "999"},
         {"game_id": "abc"},
