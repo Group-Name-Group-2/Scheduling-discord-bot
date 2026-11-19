@@ -123,7 +123,6 @@ def notify_event_invite(
 ) -> None:
     """Email each person in recipient_ids that they were added to the event."""
     event = get_event(event_id)
-
     if event is None:
         return
 
@@ -164,8 +163,8 @@ def notify_event_invite(
         f"    Game: {game_name}\n"
         f"    When: {when}\n"
         f"    Length: {duration}\n\n"
-        f"See it on your calendar: {events_url}\n\n"
-        f"Turn off these emails: {settings_url}\n"
+        #f"See it on your calendar: {events_url}\n\n"
+        #f"Turn off these emails: {settings_url}\n"
     )
 
     html = f"""\
@@ -180,22 +179,15 @@ def notify_event_invite(
     <tr><td style="padding: 2px 12px 2px 0; color: #6b7785;">Length</td>
         <td>{escape(duration)}</td></tr>
   </table>
-  <p>
-    <a href="{escape(events_url)}"
-       style="display: inline-block; padding: 10px 18px; background: #1a9fff;
-              color: #ffffff; text-decoration: none; border-radius: 6px;">
-      View calendar
-    </a>
-  </p>
   <p style="color: #6b7785; font-size: 13px;">
     <a href="{escape(settings_url)}" style="color: #6b7785;">Turn off these emails</a>.
   </p>
 </div>
 """
-
+    print("sending")
     for address in addresses.values():
         send_email(address, subject, text, html)
-
+    print("sent")
 
 def _format_when(event_date: str, event_time: str) -> str:
     """'2026-11-20', '19:00' -> 'Friday, November 20, 2026 at 7:00 PM'."""
