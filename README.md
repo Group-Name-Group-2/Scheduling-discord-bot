@@ -29,8 +29,9 @@ uv venv
 .venv\Scripts\Activate.ps1
 uv pip install -r requirements.txt
 uvicorn main:app --reload
+#if windows auth error add python -m before uvicorn
 go to 127.0.0.1:8000 in browser
-
+#email features will not work on university wifi
 ### Test accounts
 Test the site with several users without real Steam accounts.
 
@@ -67,4 +68,4 @@ python dev_seed.py --remove
 - Signing in as a test user signs you out of your own account. Sign in with Steam again to come back.
 - To be signed in as several users at once, use a different browser or a private window for each, or open one at `127.0.0.1:8000` and another at `localhost:8000`.
 
-Test accounts use Steam IDs no real account can have, and the app never asks Steam about them (see `test_accounts.py`). They show a "Test account" badge on the Admin page. Remove `DEV_LOGIN=1` from `.env` before deploying.
+Test accounts use Steam IDs no real account can have, and the app never asks Steam about them (see `fake_accounts.py`). They show a "Test account" badge on the Admin page. Remove `DEV_LOGIN=1` from `.env` before deploying.

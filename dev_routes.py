@@ -1,5 +1,5 @@
 """
-/dev/login: sign in as a test account without Steam (see test_accounts.py).
+/dev/login: sign in as a test account without Steam (see fake_accounts.py).
 
 Only registered when DEV_LOGIN=1 is in .env, and only answers requests
 from this computer, so it can't be used as a backdoor on a server.
@@ -13,7 +13,7 @@ from fastapi.templating import Jinja2Templates
 
 from database import list_users, mark_signed_in
 from steam_api import get_player_summaries
-from test_accounts import is_test_account
+from fake_accounts import is_test_account
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=BASE_DIR / "templates")

@@ -15,14 +15,18 @@ libraries and availability to the same starting data. Then set DEV_LOGIN=1 in .e
 restart the server and go to http://127.0.0.1:8000/dev/login.
 
 Test accounts use Steam IDs no real account can have, and the app never
-asks Steam about them (see test_accounts.py).
+asks Steam about them (see fake_accounts.py).
 """
 
 import argparse
+import os
 import random
+import re
 from datetime import date
 from pathlib import Path
 
+# Importing email_service loads .env, so SMTP_USERNAME is available below.
+import email_service  # noqa: F401
 from database import (
     admin_set_avatar,
     admin_set_display_name,
@@ -32,7 +36,7 @@ from database import (
 )
 from availability_routes import upcoming_weekends
 from recommender import EARLIEST_HOUR, LATEST_END_HOUR
-from test_accounts import TEST_ID_LIMIT, is_test_account, test_id_sql, test_steam_id
+from fake_accounts import TEST_ID_LIMIT, is_test_account, test_id_sql, test_steam_id
 
 NAMES = [
     "Alice", "Bob", "Carmen", "Dev", "Ellie",
@@ -108,6 +112,43 @@ def write_avatar(steam_id: str, name: str, color: str) -> str:
     return f"{AVATAR_URL}/{steam_id}.svg"
 
 
+def test_email(name: str) -> str | None:
+    """
+    SMTP_USERNAME with "+name" added before the "@", e.g.
+    you@gmail.com -> you+alice@gmail.com. Gmail (and most providers)
+    deliver these to the same inbox, so every test account's emails
+    arrive in yours. None if SMTP_USERNAME isn't an email address.
+    """
+    username = (os.getenv("SMTP_USERNAME") or "").strip().lower()
+    if not email_service.is_valid_email(username):
+        return None
+
+    local, domain = username.rsplit("@", 1)
+    tag = re.sub(r"[^a-z0-9]", "", name.lower()) or "test"
+    return f"{local}+{tag}@{domain}"
+
+
+def set_test_email(connection, steam_id: str, email: str | None) -> None:
+    """Give a test account a verified email (or none), notifications on."""
+    connection.execute(
+        "INSERT OR IGNORE INTO user_settings (steam_id) VALUES (?)",
+        (steam_id,),
+    )
+    connection.execute(
+        """
+        UPDATE user_settings
+        SET email = ?,
+            notify_messages = 1,
+            pending_email = NULL,
+            verify_token_hash = NULL,
+            verify_token_expires = NULL,
+            verify_sent_at = NULL
+        WHERE steam_id = ?
+        """,
+        (email, steam_id),
+    )
+
+
 def remove_test_accounts() -> None:
     t = test_id_sql
     with get_connection() as connection:
@@ -148,6 +189,9 @@ def seed(count: int, games_per_user: int = DEFAULT_GAMES_PER_USER) -> list[str]:
         name = NAMES[number - 1] if number <= len(NAMES) else f"User {number}"
         admin_set_display_name(steam_id, name)
         admin_set_avatar(steam_id, write_avatar(steam_id, name, AVATAR_COLORS[(number - 1) % len(AVATAR_COLORS)]))
+
+        with get_connection() as connection:
+            set_test_email(connection, steam_id, test_email(name))
 
     with get_connection() as connection:
         # Friendships stored by older versions of this script; the app now
@@ -205,6 +249,11 @@ def main() -> None:
 
     print(f"Created {len(test_ids)} test accounts ({test_ids[0]} to {test_ids[-1]}).")
     print("They're friends with every user, including anyone who signs up later.")
+    example = test_email(NAMES[0])
+    if example:
+        print(f"Each has a verified email like {example}, so notifications go to your SMTP inbox.")
+    else:
+        print("SMTP_USERNAME isn't set in .env, so the test accounts have no email address.")
     print("Set DEV_LOGIN=1 in .env, restart the server, then open http://127.0.0.1:8000/dev/login")
 
 
